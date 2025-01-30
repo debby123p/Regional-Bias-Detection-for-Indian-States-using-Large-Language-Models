@@ -1,0 +1,2 @@
+# Detecting-Confirmation-bias-in-Indian-Context-and-their-effect-on-people
+This project focuses on analyzing the confirmation biases that exists in India, among the states of the country. The immense diversity of the country has the negative side of creation of biases among people about other states, we want to address this issue by analyzing our own curated dataset and furthwe utilise them in benefitting the public.
