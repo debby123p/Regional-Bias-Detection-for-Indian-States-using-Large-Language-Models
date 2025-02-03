@@ -1,2 +1,3 @@
-# Detecting-Confirmation-biases-in-Indian-Context-and-their-effect-on-people
-This project focuses on analyzing the confirmation biases in India, among the country's states. The immense diversity of the country has the negative side of the creation of biases among people about other states, we want to address this issue by analyzing our own curated dataset and further utilising them to benefit the public.
+# Summarizing-personalised-social-biases-towards-Indian-states-using-LLMs
+Overview
+This project aims to analyze and summarize state-wise social biases in India using large language models (LLMs). Leveraging Reddit, Quora, and YouTube data, we extract and analyze public sentiments, classify them, and summarize biases using different LLMs. The goal is to create a dataset that captures state-specific biases and evaluate various LLMs' ability to summarize these biases accurately.
