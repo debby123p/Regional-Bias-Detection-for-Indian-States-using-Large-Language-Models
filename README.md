@@ -51,6 +51,17 @@ Use LLMs to assess personal biases and their impact on decision-making.
 
 Train LLMs to recognize and counteract subtle biases in language processing.
 
+## Literature Review
+
+Here are some papers I've studied for this project:
+
+- *IndiBias: A Benchmark Dataset to Measure Social Biases in Language Models for Indian Context*- [Read here](https://arxiv.org/abs/2403.20147)
+- *MuRIL: Multilingual Representations for Indian Languages* - [Read here](https://arxiv.org/abs/2103.10730)
+- *Socially Aware Bias Measurements for Hindi Language Representations* - [Read here](https://arxiv.org/abs/2110.07871)
+- *StereoSet: Measuring stereotypical bias in pretrained language models* - [Read Here](https://aclanthology.org/2021.acl-long.416/)
+- *Differences in decisions affected by cognitive biases: examining human values, need for cognition, and numeracy* - [Read Here](https://prc.springeropen.com/articles/10.1186/s41155-023-00265-z?utm_source=chatgpt.com)
+- *Behavioural Biases and Investment Decision-Making in India:A Study of Stock Market Investors* - [Read Here](https://irjems.org/Volume-3-Issue-11/IRJEMS-V3I11P102.pdf)
+
 
 ## Dataset 
 
@@ -70,6 +81,7 @@ This presentation has information about different biases existing in the country
 This presentation discusses a paper on the IndiBias dataset, its preparation, and usage with LLM models. We also talked about the policies we will follow while preparing our dataset.
 
 - [Presentation-3](https://docs.google.com/presentation/d/17diW7yOIRtt_v0C7wlCgANla-Mhv1QYeCot7fvIYDSQ/edit?usp=sharing)
+
 In this presentation, we discussed the initial crawled data from Reddit and how we can utilize this data for our study, along with a discussion on increasing the dataset.
 
 - [Presentation-4](https://docs.google.com/presentation/d/1EOsByCeHv7QQt2Xl9uS-QlDkeVRkMvMI0lCIEopzjMA/edit?usp=sharing)
