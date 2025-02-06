@@ -59,4 +59,19 @@ Train LLMs to recognize and counteract subtle biases in language processing.
 This link contains a file called final_merged_comments that has comments crawled from three different social media platforms that are Reddit, Quora and YouTube. Along with that, there is another file named clean_comments that has the comments after cleaning the raw data, and the data cleaning methods applied here are very simple, like removal of missing values, empty rows, and removal of repetitive spam comments and emojis.
 
 
+## Presentations 
 
+- [Presentation-1](https://docs.google.com/presentation/d/1FpWwApohY7X4-R5gs5h47mRoa3VcavL6whEYGOiM4mQ/edit?usp=sharing)
+  
+This presentation has information about different biases existing in the country in the context of regional stereotypes, myths and beliefs. Along with a breakdown of state-wise biases in axes like caste, regionality, occupation, physical looks and habits( food, alcohol, tobacco, loud, fun, etc).
+  
+- [Presentation-2](https://docs.google.com/presentation/d/1B6vRR1Crb4xsdH-tQWH9BkGmoPiLYEBEb1AikXks-Vs/edit?usp=sharing)
+
+This presentation discusses a paper on the IndiBias dataset, its preparation, and usage with LLM models. We also talked about the policies we will follow while preparing our dataset.
+
+- [Presentation-3](https://docs.google.com/presentation/d/17diW7yOIRtt_v0C7wlCgANla-Mhv1QYeCot7fvIYDSQ/edit?usp=sharing)
+In this presentation, we discussed the initial crawled data from Reddit and how we can utilize this data for our study, along with a discussion on increasing the dataset.
+
+- [Presentation-4](https://docs.google.com/presentation/d/1EOsByCeHv7QQt2Xl9uS-QlDkeVRkMvMI0lCIEopzjMA/edit?usp=sharing)
+
+In this presentation, we clearly outline the data collected from various social media platforms and detail how we constructed the dataset by merging all comments and responses. We also emphasize our comprehensive data cleaning process, which involved addressing missing values, eliminating duplicates, normalizing text, and removing repetitive comments.
