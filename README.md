@@ -51,3 +51,12 @@ Use LLMs to assess personal biases and their impact on decision-making.
 
 Train LLMs to recognize and counteract subtle biases in language processing.
 
+
+## Dataset 
+
+- [Dataset (Google Drive)](https://drive.google.com/drive/folders/1uS5B-y4OAZvb9xHRS7ZrXh5QVyHtik41?usp=drive_link)
+
+This link contains a file called final_merged_comments that has comments crawled from three different social media platforms that are Reddit, Quora and YouTube. Along with that, there is another file named clean_comments that has the comments after cleaning the raw data, and the data cleaning methods applied here are very simple, like removal of missing values, empty rows, and removal of repetitive spam comments and emojis.
+
+
+
