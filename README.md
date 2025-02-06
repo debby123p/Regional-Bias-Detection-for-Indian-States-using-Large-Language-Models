@@ -62,7 +62,11 @@ Here are some papers I've studied for this project:
 - *Differences in decisions affected by cognitive biases: examining human values, need for cognition, and numeracy* - [Read Here](https://prc.springeropen.com/articles/10.1186/s41155-023-00265-z?utm_source=chatgpt.com)
 - *Behavioural Biases and Investment Decision-Making in India:A Study of Stock Market Investors* - [Read Here](https://irjems.org/Volume-3-Issue-11/IRJEMS-V3I11P102.pdf)
 
+## Studying regional biases
+- [List of regional biases](https://docs.google.com/spreadsheets/d/1eKwjUe5UhHZSvtNiS4Kwy0dyowl7G2V6oPXfzHFRATg/edit?usp=sharing)
 
+This is a list of regional biases in India, categorized into various types of cognitive biases. The information is gathered through an extensive study of news articles and social media discussions, as well as a Google Form circulated among my classmates.
+  
 ## Dataset 
 
 - [Dataset (Google Drive)](https://drive.google.com/drive/folders/1uS5B-y4OAZvb9xHRS7ZrXh5QVyHtik41?usp=drive_link)
