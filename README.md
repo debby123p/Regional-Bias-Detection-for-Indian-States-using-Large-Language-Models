@@ -5,7 +5,7 @@ This project aims to analyze and summarize state-wise social biases in India usi
 
 ## Project Workflow
 
-**1. Dataset Preparation**
+**1. Dataset Preparation:**
    
 Crawl and extract state-wise social bias-related comments from:
 
@@ -17,19 +17,19 @@ Crawl and extract state-wise social bias-related comments from:
 
 Preprocess and clean the dataset to remove noise and irrelevant data.
 
-**2.  Sentiment Classification**
+**2.  Sentiment Classification:**
 
 Apply a sentiment classifier to each comment to assign a sentiment score.
 
 Categorize comments into positive and negative classes.
 
-**3.  Grouping by State**
+**3.  Grouping by State:**
 
 Aggregate comments based on states.
 
 Maintain sentiment scores to retain polarity information.
 
-**4. LLM-Based Summarization**
+**4. LLM-Based Summarization:**
 
 Feed grouped state-wise comments into different LLMs.
 
@@ -37,13 +37,13 @@ Summarize the positive and negative biases about each state.
 
 Compare model performance using summarization scores.
 
-**5. Fine-Tuning LLMs**
+**5. Fine-Tuning LLMs:**
 
 Use the gathered dataset to fine-tune LLMs.
 
 Improve the models’ understanding of deep-rooted social biases in India.
 
-**6. Future Prospects**
+**6. Future Prospects:**
 
 Develop a psychometric test to detect unconscious social biases in hiring policies.
 
