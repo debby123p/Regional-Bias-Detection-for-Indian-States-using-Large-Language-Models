@@ -91,3 +91,7 @@ In this presentation, we discussed the initial crawled data from Reddit and how 
 - [Presentation-4](https://docs.google.com/presentation/d/1EOsByCeHv7QQt2Xl9uS-QlDkeVRkMvMI0lCIEopzjMA/edit?usp=sharing)
 
 In this presentation, we clearly outline the data collected from various social media platforms and detail how we constructed the dataset by merging all comments and responses. We also emphasize our comprehensive data cleaning process, which involved addressing missing values, eliminating duplicates, normalizing text, and removing repetitive comments.
+
+- [Presentation(Mid-sem Evaluation)](https://docs.google.com/presentation/d/14-uCZWOnULY_gTC-6fnmfTM6U07NvvCodDSRbGkF2rc/edit?usp=sharing)
+
+  
