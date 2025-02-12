@@ -98,7 +98,8 @@ In this presentation, we clearly outline the data collected from various social 
 ## Code
 
 - [Data_cleaning](https://colab.research.google.com/drive/1qEGHVvUY9JrtbDrsh5AwGrvR2eSdiP5T?authuser=0#scrollTo=Bam4mgJi-HXW)
-This file contains the cleaning of the dataset, where primary cleaning is done, along with utilising SBERT model, we have calculated the word-similarity score to categorized comments in the following categories:
+- 
+This file contains the cleaning of the dataset, where primary cleaning is done, along with utilising the SBERT model, we have calculated the word-similarity score to categorise comments in the following categories:
 
 1) Positive
 2) Negative
