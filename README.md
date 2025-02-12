@@ -71,7 +71,7 @@ This is a list of regional biases in India, categorized into various types of co
 
 - [Dataset (Google Drive)](https://drive.google.com/drive/folders/1uS5B-y4OAZvb9xHRS7ZrXh5QVyHtik41?usp=drive_link)
 
-This link contains a file called final_merged_comments that has comments crawled from three different social media platforms that are Reddit, Quora and YouTube. Along with that, there is another file named clean_comments that has the comments after cleaning the raw data, and the data cleaning methods applied here are very simple, like removal of missing values, empty rows, and removal of repetitive spam comments and emojis.
+This link contains a file called final_merged_comments that has comments crawled from three different social media platforms that are Reddit, Quora and YouTube. Along with that, another file named clean_comments has the comments after cleaning the raw data, and the data cleaning methods applied here are elementary, like the removal of missing values, and empty rows, and the removal of repetitive spam comments and emojis.
 
 
 ## Presentations 
@@ -95,3 +95,11 @@ In this presentation, we clearly outline the data collected from various social 
 - [Presentation(Mid-sem Evaluation)](https://docs.google.com/presentation/d/14-uCZWOnULY_gTC-6fnmfTM6U07NvvCodDSRbGkF2rc/edit?usp=sharing)
 
   
+## Code
+
+- [Data_cleaning](https://colab.research.google.com/drive/1qEGHVvUY9JrtbDrsh5AwGrvR2eSdiP5T?authuser=0#scrollTo=Bam4mgJi-HXW)
+This file contains the cleaning of the dataset, where primary cleaning is done, along with utilising SBERT model, we have calculated the word-similarity score to categorized comments in the following categories:
+
+1) Positive
+2) Negative
+3) Others
