@@ -104,3 +104,8 @@ This file contains the cleaning of the dataset, where primary cleaning is done, 
 1) Positive
 2) Negative
 3) Others
+
+- [Standard Sbert model](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/standard_sbert.py)
+- [MiniLM_L6_model](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/minilm_l6_sbert.py)
+  
+  This is for filtering comments relevant to my project using the SBERT model, here we have once used the standard SBERT model and MiniLM_L6(Distilled SBERT), which are the above two models.
