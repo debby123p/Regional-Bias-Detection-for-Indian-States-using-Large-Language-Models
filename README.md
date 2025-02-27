@@ -109,3 +109,17 @@ This file contains the cleaning of the dataset, where primary cleaning is done, 
 - [MiniLM_L6_model](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/minilm_l6_sbert.py)
   
   This is for filtering comments relevant to my project using the SBERT model, here we have once used the standard SBERT model and MiniLM_L6(Distilled SBERT), which are the above two models.
+
+  ## Sentiment Classification
+
+- [RoBERTa](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_roberta.py)
+- [mBERT](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_mbert.py)
+- [MURIL](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_muril.py)
+- [IndicBERT](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_indicbert.py)
+- [XLM_RoBERTa](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_xlm_roberta.py)
+- [XLM_RoBERTa_with_thresholding](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_xlm_roberta_0.5.py)
+- [LLaMa_3.2_1B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_llama_3.2_1b.py)
+- [LLaMa_3.2_1B_instruct](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_llama_3.2_1b_instruct.py)
+- [LLaMa_3.2_3B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_llama_3.2_3b.py)
+- [Claude](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_claude.py)
+- [Mistral_7B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_mistral_7B.py)
