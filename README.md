@@ -72,28 +72,6 @@ This is a list of regional biases in India, categorized into various types of co
 - [Dataset (Google Drive)](https://drive.google.com/drive/folders/1uS5B-y4OAZvb9xHRS7ZrXh5QVyHtik41?usp=drive_link)
 
 This link contains a file called final_merged_comments that has comments crawled from three different social media platforms that are Reddit, Quora and YouTube. Along with that, another file named clean_comments has the comments after cleaning the raw data, and the data cleaning methods applied here are elementary, like the removal of missing values, and empty rows, and the removal of repetitive spam comments and emojis.
-
-
-## Presentations 
-
-- [Presentation-1](https://docs.google.com/presentation/d/1FpWwApohY7X4-R5gs5h47mRoa3VcavL6whEYGOiM4mQ/edit?usp=sharing)
-  
-This presentation has information about different biases existing in the country in the context of regional stereotypes, myths and beliefs. Along with a breakdown of state-wise biases in axes like caste, regionality, occupation, physical looks and habits( food, alcohol, tobacco, loud, fun, etc).
-  
-- [Presentation-2](https://docs.google.com/presentation/d/1B6vRR1Crb4xsdH-tQWH9BkGmoPiLYEBEb1AikXks-Vs/edit?usp=sharing)
-
-This presentation discusses a paper on the IndiBias dataset, its preparation, and usage with LLM models. We also talked about the policies we will follow while preparing our dataset.
-
-- [Presentation-3](https://docs.google.com/presentation/d/17diW7yOIRtt_v0C7wlCgANla-Mhv1QYeCot7fvIYDSQ/edit?usp=sharing)
-
-In this presentation, we discussed the initial crawled data from Reddit and how we can utilize this data for our study, along with a discussion on increasing the dataset.
-
-- [Presentation-4](https://docs.google.com/presentation/d/1EOsByCeHv7QQt2Xl9uS-QlDkeVRkMvMI0lCIEopzjMA/edit?usp=sharing)
-
-In this presentation, we clearly outline the data collected from various social media platforms and detail how we constructed the dataset by merging all comments and responses. We also emphasize our comprehensive data cleaning process, which involved addressing missing values, eliminating duplicates, normalizing text, and removing repetitive comments.
-
-- [Presentation(Mid-sem Evaluation)](https://docs.google.com/presentation/d/14-uCZWOnULY_gTC-6fnmfTM6U07NvvCodDSRbGkF2rc/edit?usp=sharing)
-
   
 ## Code
 
@@ -176,19 +154,41 @@ A classification technique that refers to the ability of large language models t
 
 - [LLaMa_3.2_3B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/llama_3.2_3b)
 - [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/deepseek_r1_distill_qwen_7b.py)
+- [Gemma_3_4B_it]
 - [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/mistral_7b_instruct_v0.3)
+- [Qwen_2.5_7B_instruct]
+- [Deepseek_R1_Distill_Qwen_7B]
 
 **Few-Shot Classification:**
 
 The classification techniques involve the use of a smaller number of examples within the prompt itself. These examples illustrate the desired input-output behaviour for the task. These examples help the model better adapt its pre-trained knowledge to specific nuances in the classification. 
 
-The examples are randomly selected from the annotated dataset, that is, **50 comments tagged regional biases and 50 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
-
 **Few-Shot (Support-100)**
 
--[Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/deepseek_r1_distill_qwen_1.5b.py)
--[Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/mistral_7b_instruct_v0.3.py)
+The examples are randomly selected from the annotated dataset, that is, **50 comments tagged regional biases and 50 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
 
+- [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/deepseek_r1_distill_qwen_1.5b.py)
+- [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/mistral_7b_instruct_v0.3.py)
+- [Qwen_2.5_7B_instruct]
+- [Deepseek_R1_Distill_Qwen_7B]
+
+**Few-Shot (Support-150)**
+
+The examples are randomly selected from the annotated dataset, that is, **75 comments tagged regional biases and 75 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
+
+- [Deepseek_R1_Distill_Qwen_1.5B]
+- [Mistral_7B_instruct_v0.3]
+- [Qwen_2.5_7B_instruct]
+- [Deepseek_R1_Distill_Qwen_7B]
+  
+**Few-Shot (Support-200)**
+
+The examples are randomly selected from the annotated dataset, that is, **100 comments tagged regional biases and 100 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
+
+- [Deepseek_R1_Distill_Qwen_1.5B]
+- [Mistral_7B_instruct_v0.3]
+- [Qwen_2.5_7B_instruct]
+- [Deepseek_R1_Distill_Qwen_7B]
 
 
 
