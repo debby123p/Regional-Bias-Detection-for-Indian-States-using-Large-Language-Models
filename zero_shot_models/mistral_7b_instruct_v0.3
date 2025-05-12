@@ -1,0 +1,479 @@
+#!/usr/bin/env python3
+"""
+Zero-shot binary classification for regional bias detection using Mistral-7B-Instruct-v0.3
+with Chain-of-Thought prompting - Multiple iterations
+Author: Debasmita
+"""
+
+import os
+import pandas as pd
+import numpy as np
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from tqdm import tqdm
+import json
+from datetime import datetime
+import gc
+from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+from huggingface_hub import login
+from collections import Counter
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+
+# Set environment variables
+os.environ['HF_HOME'] = '/DATA2/akash/huggingface_cache'
+os.environ['TRANSFORMERS_CACHE'] = '/DATA2/akash/huggingface_cache'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # Use GPU 0
+
+# Login to HuggingFace
+try:
+    # First try to use token from environment
+    if "HF_TOKEN" in os.environ:
+        login(token=os.environ["HF_TOKEN"])
+        print("Successfully logged in to HuggingFace using environment token")
+    else:
+        # Try to use cached credentials
+        login()
+        print("Successfully logged in to HuggingFace using cached credentials")
+except Exception as e:
+    print(f"Warning: Could not log in to HuggingFace: {e}")
+    print("Attempting to proceed without login...")
+
+class RegionalBiasClassifier:
+    def __init__(self, model_name="mistralai/Mistral-7B-Instruct-v0.3"):
+        print(f"Initializing {model_name}")
+        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+        print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+        
+        # Clear GPU cache before loading
+        torch.cuda.empty_cache()
+        
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            cache_dir="/DATA2/akash/huggingface_cache"
+        )
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        # Force the model to load fully on GPU
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map={'': 0},  # Force everything to GPU 0
+            cache_dir="/DATA2/akash/huggingface_cache",
+            low_cpu_mem_usage=True,
+            max_memory={0: "35GB"},  # Use up to 35GB on GPU 0
+        )
+        
+        # Ensure model is on GPU
+        if not next(self.model.parameters()).is_cuda:
+            self.model = self.model.to("cuda")
+        
+        # Set to evaluation mode
+        self.model.eval()
+        
+        print(f"Model loaded. Memory allocated: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+        print(f"Memory reserved: {torch.cuda.memory_reserved(0) / 1e9:.2f} GB")
+        
+    def classify_with_cot(self, text):
+        """
+        Classify using Chain-of-Thought prompting for better reasoning
+        """
+        cot_prompt = f"""[INST] You are an expert in identifying regional biases in comments about Indian states and regions. 
+Your task is to determine whether a comment contains regional bias or not.
+
+Regional bias includes stereotypes, prejudices, or discriminatory statements about:
+- Indian states or regions
+- People from specific Indian states  
+- Cultural, linguistic, economic, political, or infrastructural aspects of Indian regions
+
+Please analyze the following comment step by step:
+
+Comment: "{text}"
+
+Step 1: First, identify if this comment mentions any Indian state, region, or people from specific regions.
+
+Step 2: Check if the comment contains any of these elements:
+- Stereotypical statements about people from a region
+- Generalizations about a state or its people
+- Discriminatory language targeting regional identity
+- Prejudiced views about regional culture, language, or traditions
+- Biased statements about economic or developmental status
+- Political stereotypes associated with regions
+
+Step 3: Determine if these elements, if present, constitute bias or are merely factual/neutral observations.
+
+Step 4: Based on your analysis, classify this comment as:
+- "regional_bias": If it contains prejudiced, stereotypical, or discriminatory content about Indian regions/states
+- "non_regional_bias": If it's neutral, factual, or does not contain regional bias
+
+Please provide your reasoning followed by your final classification.
+
+Format your response as:
+Reasoning: [Your step-by-step analysis]
+Classification: [regional_bias/non_regional_bias] [/INST]
+"""
+        
+        inputs = self.tokenizer(cot_prompt, return_tensors="pt", truncation=True, max_length=2048).to("cuda")
+        
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=300,
+                temperature=0.1,
+                do_sample=False,
+                pad_token_id=self.tokenizer.pad_token_id,
+                use_cache=True
+            )
+        
+        response = self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
+        
+        # Clear intermediate tensors
+        del outputs, inputs
+        torch.cuda.empty_cache()
+        
+        # Extract classification and reasoning
+        try:
+            lines = response.strip().split('\n')
+            reasoning = ""
+            classification = ""
+            
+            for line in lines:
+                if line.startswith("Reasoning:"):
+                    reasoning = line.replace("Reasoning:", "").strip()
+                elif line.startswith("Classification:"):
+                    classification = line.replace("Classification:", "").strip().lower()
+            
+            # Validate classification
+            if classification not in ["regional_bias", "non_regional_bias"]:
+                print(f"Invalid classification: {classification}")
+                classification = "error"
+            
+            return {
+                "classification": classification,
+                "reasoning": reasoning,
+                "full_response": response
+            }
+        except Exception as e:
+            print(f"Error parsing response: {e}")
+            print(f"Full response: {response}")
+            return {
+                "classification": "error",
+                "reasoning": "Error in parsing",
+                "full_response": response
+            }
+
+def save_iteration_results(iteration_results, output_dir, iteration_num, timestamp):
+    """Save results for a single iteration"""
+    # Save as JSON
+    json_file = f"{output_dir}mistral_iteration_{iteration_num}_results_{timestamp}.json"
+    with open(json_file, 'w') as f:
+        json.dump(iteration_results, f, indent=2)
+    
+    # Save as detailed CSV
+    df_results = pd.DataFrame(iteration_results)
+    csv_file = f"{output_dir}mistral_iteration_{iteration_num}_detailed_{timestamp}.csv"
+    df_results.to_csv(csv_file, index=False)
+    
+    # Save predictions only CSV
+    predictions_data = []
+    for result in iteration_results:
+        predictions_data.append({
+            'index': result['index'],
+            'comment': result['original_comment'],
+            'prediction': result['classification'],
+            'prediction_binary': 1 if result['classification'] == 'regional_bias' else 0 if result['classification'] == 'non_regional_bias' else -1,
+            'reasoning': result.get('reasoning', '')
+        })
+    
+    df_predictions = pd.DataFrame(predictions_data)
+    predictions_csv = f"{output_dir}mistral_iteration_{iteration_num}_predictions_{timestamp}.csv"
+    df_predictions.to_csv(predictions_csv, index=False)
+    
+    print(f"Iteration {iteration_num} results saved:")
+    print(f"  - JSON: {json_file}")
+    print(f"  - Detailed CSV: {csv_file}")
+    print(f"  - Predictions CSV: {predictions_csv}")
+    
+    return predictions_csv
+
+def generate_evaluation_report(all_iterations_predictions, ground_truth, all_iterations_results, output_dir):
+    """Generate comprehensive evaluation report for multiple iterations"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Calculate final predictions using majority voting
+    final_predictions = []
+    for i in range(len(ground_truth)):
+        predictions_for_sample = [predictions[i] for predictions in all_iterations_predictions if i < len(predictions)]
+        if predictions_for_sample:
+            final_predictions.append(Counter(predictions_for_sample).most_common(1)[0][0])
+    
+    # Calculate metrics for final predictions
+    report = classification_report(ground_truth, final_predictions, 
+                                target_names=['Non-Regional Bias', 'Regional Bias'], 
+                                output_dict=True)
+    report_text = classification_report(ground_truth, final_predictions, 
+                                      target_names=['Non-Regional Bias', 'Regional Bias'])
+    conf_matrix = confusion_matrix(ground_truth, final_predictions)
+    
+    # Save classification report as text file
+    report_file = f"{output_dir}classification_report_mistral_{timestamp}.txt"
+    with open(report_file, 'w') as f:
+        f.write("=== Classification Report - Mistral-7B-Instruct-v0.3 (3 Iterations with Majority Voting) ===\n\n")
+        f.write(f"Model: mistralai/Mistral-7B-Instruct-v0.3\n")
+        f.write(f"Timestamp: {timestamp}\n")
+        f.write(f"Total Samples: {len(final_predictions)}\n")
+        f.write(f"Number of Iterations: 3\n\n")
+        f.write(report_text)
+        f.write("\n\n=== Confusion Matrix ===\n")
+        f.write(str(conf_matrix))
+        f.write("\n\nRows: Actual labels\n")
+        f.write("Columns: Predicted labels\n")
+        f.write("[0, 0] = True Negatives (Non-Regional Bias correctly classified)\n")
+        f.write("[0, 1] = False Positives (Non-Regional Bias incorrectly classified as Regional)\n")
+        f.write("[1, 0] = False Negatives (Regional Bias incorrectly classified as Non-Regional)\n")
+        f.write("[1, 1] = True Positives (Regional Bias correctly classified)\n")
+        
+        # Add iteration-wise metrics
+        f.write("\n\n=== Iteration-wise Performance ===\n")
+        for i, predictions in enumerate(all_iterations_predictions):
+            iter_report = classification_report(ground_truth[:len(predictions)], predictions, 
+                                              target_names=['Non-Regional Bias', 'Regional Bias'], 
+                                              output_dict=True)
+            f.write(f"\nIteration {i+1} Accuracy: {iter_report['accuracy']:.4f}")
+    
+    # Create visualizations
+    # 1. Final Confusion Matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=['Non-Regional', 'Regional'],
+                yticklabels=['Non-Regional', 'Regional'])
+    plt.title('Confusion Matrix - Mistral-7B (Majority Voting from 3 Iterations)')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.tight_layout()
+    confusion_matrix_file = f"{output_dir}confusion_matrix_mistral_{timestamp}.png"
+    plt.savefig(confusion_matrix_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # 2. Iteration Agreement Visualization
+    plt.figure(figsize=(10, 6))
+    agreement_data = []
+    for i in range(len(ground_truth)):
+        predictions_for_sample = [predictions[i] for predictions in all_iterations_predictions if i < len(predictions)]
+        if predictions_for_sample:
+            agreement = len(set(predictions_for_sample)) == 1
+            agreement_data.append(1 if agreement else 0)
+    
+    agreement_rate = sum(agreement_data) / len(agreement_data) if agreement_data else 0
+    plt.bar(['Agreement', 'Disagreement'], 
+            [sum(agreement_data), len(agreement_data) - sum(agreement_data)], 
+            color=['green', 'red'])
+    plt.title(f'Iteration Agreement Rate: {agreement_rate:.2%}')
+    plt.ylabel('Number of Samples')
+    agreement_file = f"{output_dir}iteration_agreement_mistral_{timestamp}.png"
+    plt.savefig(agreement_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Save detailed evaluation report as JSON
+    report_data = {
+        'timestamp': timestamp,
+        'model': 'mistralai/Mistral-7B-Instruct-v0.3',
+        'total_samples': len(final_predictions),
+        'accuracy': report['accuracy'],
+        'metrics': {
+            'non_regional_bias': report['Non-Regional Bias'],
+            'regional_bias': report['Regional Bias'],
+            'weighted_avg': report['weighted avg'],
+            'macro_avg': report['macro avg']
+        },
+        'confusion_matrix': conf_matrix.tolist(),
+        'predictions_distribution': {
+            'non_regional_bias': int(np.sum(np.array(final_predictions) == 0)),
+            'regional_bias': int(np.sum(np.array(final_predictions) == 1))
+        }
+    }
+    
+    json_report_file = f"{output_dir}evaluation_report_mistral_{timestamp}.json"
+    with open(json_report_file, 'w') as f:
+        json.dump(report_data, f, indent=2)
+    
+    print("\n=== Evaluation Report ===")
+    print(f"Model: Mistral-7B-Instruct-v0.3")
+    print(f"Total Samples: {len(final_predictions)}")
+    print(f"Accuracy: {report['accuracy']:.4f}")
+    print("\nClass-wise Metrics:")
+    print(f"Non-Regional Bias - Precision: {report['Non-Regional Bias']['precision']:.4f}, "
+          f"Recall: {report['Non-Regional Bias']['recall']:.4f}, "
+          f"F1: {report['Non-Regional Bias']['f1-score']:.4f}")
+    print(f"Regional Bias - Precision: {report['Regional Bias']['precision']:.4f}, "
+          f"Recall: {report['Regional Bias']['recall']:.4f}, "
+          f"F1: {report['Regional Bias']['f1-score']:.4f}")
+    print(f"\nFiles saved:")
+    print(f"- Classification Report: {report_file}")
+    print(f"- Confusion Matrix: {confusion_matrix_file}")
+    print(f"- Agreement Visualization: {agreement_file}")
+    print(f"- Detailed JSON Report: {json_report_file}")
+
+def main():
+    # Configuration
+    data_path = "/DATA2/akash/venvs/debasmita/data/annotated_experiment - Sheet1.csv"
+    output_dir = "/DATA2/akash/venvs/debasmita/results/zero_shot/"
+    num_iterations = 3
+    
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Load data
+    print(f"Loading data from {data_path}")
+    df = pd.read_csv(data_path)
+    print(f"Data shape: {df.shape}")
+    print(f"Columns: {df.columns.tolist()}")
+    
+    # Initialize classifier
+    classifier = RegionalBiasClassifier()
+    
+    # Store results for all iterations
+    all_iterations_results = []
+    all_iterations_predictions = []
+    ground_truth = []
+    iteration_csv_files = []
+    
+    print(f"\nStarting classification with Chain-of-Thought reasoning ({num_iterations} iterations)...")
+    
+    # Run multiple iterations
+    for iteration in range(num_iterations):
+        print(f"\n=== Iteration {iteration + 1}/{num_iterations} ===")
+        
+        iteration_results = []
+        iteration_predictions = []
+        
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Iteration {iteration + 1}"):
+            comment = str(row['Comment'])
+            
+            try:
+                # Get classification with CoT
+                result = classifier.classify_with_cot(comment)
+                
+                # Store results
+                result['index'] = idx
+                result['original_comment'] = comment
+                result['iteration'] = iteration + 1
+                iteration_results.append(result)
+                
+                # For evaluation
+                if result['classification'] != 'error':
+                    iteration_predictions.append(1 if result['classification'] == 'regional_bias' else 0)
+                    
+                    # Collect ground truth only in first iteration
+                    if iteration == 0:
+                        if 'Score' in df.columns:  # Assuming Score > 0 means regional bias
+                            ground_truth.append(1 if float(row['Score']) > 0 else 0)
+                        elif 'Level-1' in df.columns:  # Alternative ground truth column
+                            ground_truth.append(1 if float(row['Level-1']) > 0 else 0)
+                
+            except Exception as e:
+                print(f"Error processing comment {idx} in iteration {iteration + 1}: {e}")
+                iteration_results.append({
+                    "index": idx,
+                    "original_comment": comment,
+                    "classification": "error",
+                    "reasoning": f"Error: {str(e)}",
+                    "full_response": "",
+                    "iteration": iteration + 1
+                })
+            
+            # Clear GPU cache periodically
+            if (idx + 1) % 50 == 0:
+                torch.cuda.empty_cache()
+                gc.collect()
+        
+        # Store iteration results
+        all_iterations_results.append(iteration_results)
+        all_iterations_predictions.append(iteration_predictions)
+        
+        # Save iteration results (JSON, detailed CSV, and predictions CSV)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        predictions_csv = save_iteration_results(iteration_results, output_dir, iteration + 1, timestamp)
+        iteration_csv_files.append(predictions_csv)
+        
+        print(f"Iteration {iteration + 1} completed.")
+    
+    # Combine results and calculate final predictions
+    final_results = []
+    for idx in range(len(df)):
+        comment_results = []
+        for iteration_results in all_iterations_results:
+            for result in iteration_results:
+                if result['index'] == idx:
+                    comment_results.append(result)
+        
+        # Get classifications from all iterations
+        classifications = [r['classification'] for r in comment_results if r['classification'] != 'error']
+        
+        # Use majority voting for final classification
+        if classifications:
+            final_classification = Counter(classifications).most_common(1)[0][0]
+        else:
+            final_classification = 'error'
+        
+        final_results.append({
+            'index': idx,
+            'original_comment': df.iloc[idx]['Comment'],
+            'final_classification': final_classification,
+            'iteration_classifications': classifications,
+            'all_iteration_results': comment_results
+        })
+    
+    # Save final combined results
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    final_results_file = f"{output_dir}mistral_final_results_{timestamp}.json"
+    with open(final_results_file, 'w') as f:
+        json.dump(final_results, f, indent=2)
+    
+    # Save final combined CSV
+    final_df_data = []
+    for result in final_results:
+        final_df_data.append({
+            'index': result['index'],
+            'comment': result['original_comment'],
+            'final_classification': result['final_classification'],
+            'final_classification_binary': 1 if result['final_classification'] == 'regional_bias' else 0 if result['final_classification'] == 'non_regional_bias' else -1,
+            'iteration_1': result['iteration_classifications'][0] if len(result['iteration_classifications']) > 0 else 'N/A',
+            'iteration_2': result['iteration_classifications'][1] if len(result['iteration_classifications']) > 1 else 'N/A',
+            'iteration_3': result['iteration_classifications'][2] if len(result['iteration_classifications']) > 2 else 'N/A',
+            'num_iterations_completed': len(result['iteration_classifications']),
+            'all_agree': len(set(result['iteration_classifications'])) == 1 if result['iteration_classifications'] else False
+        })
+    
+    final_df = pd.DataFrame(final_df_data)
+    final_csv_file = f"{output_dir}mistral_final_combined_{timestamp}.csv"
+    final_df.to_csv(final_csv_file, index=False)
+    
+    print(f"\nFinal combined results saved to:")
+    print(f"- JSON: {final_results_file}")
+    print(f"- CSV: {final_csv_file}")
+    
+    # Generate evaluation report if ground truth is available
+    if ground_truth:
+        generate_evaluation_report(all_iterations_predictions, ground_truth, all_iterations_results, output_dir)
+    else:
+        print("No ground truth available for evaluation")
+    
+    print("\nAll iteration CSV files:")
+    for i, csv_file in enumerate(iteration_csv_files):
+        print(f"Iteration {i+1}: {csv_file}")
+
+if __name__ == "__main__":
+    # Check GPU availability
+    if not torch.cuda.is_available():
+        print("No GPU available!")
+        exit(1)
+    
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"CUDA version: {torch.version.cuda}")
+    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    
+    # Run classification
+    main()
