@@ -108,29 +108,29 @@ We have developed a comprehensive annotation framework to understand the nature 
 
 **Level 1: Regional Bias vs Non-Regional Bias**
 
-Non-Regional Bias (NRB): Comments that do not express any social bias. (Score: 0)
+- Non-Regional Bias (NRB): Comments that do not express any social bias. (Score: 0)
 
-Regional Bias (RB): Comments reinforcing or propagating social biases about any state based on their languages, caste, culture, economic, and infrastructural development. (Score: 1)
+- Regional Bias (RB): Comments reinforcing or propagating social biases about any state based on their languages, caste, culture, economic, and infrastructural development. (Score: 1)
 
 **Level-2: Severity of the Comments**
 
-Mild (Score 1): Slight bias, indirectly reinforced stereotype.
+- Mild (Score 1): Slight bias, indirectly reinforced stereotype.
 
-Moderate (Score 2): Clear bias, reinforcing stereotypes with some intent.
+- Moderate (Score 2): Clear bias, reinforcing stereotypes with some intent.
 
-Severe (Score 3): Strong bias, explicitly promoting discrimination or prejudice.
+- Severe (Score 3): Strong bias, explicitly promoting discrimination or prejudice.
 
 **Level 3: Bias Category**
 
-Linguistic Bias (LB): Based on language superiority/inferiority.
+- Linguistic Bias (LB): Based on language superiority/inferiority.
 
-Cultural Bias (CB): Based on customs, morals, traditions, festivals, food, and lifestyle.
+- Cultural Bias (CB): Based on customs, morals, traditions, festivals, food, and lifestyle.
 
-Economic Bias (EB): Based on the economic status of the state, GDP per capita, financial status, and social class.
+- Economic Bias (EB): Based on the economic status of the state, GDP per capita, financial status, and social class.
 
-Political Bias (PB): The political landscape, ideology, and the effect of politics in shaping people's opinions.
+- Political Bias (PB): The political landscape, ideology, and the effect of politics in shaping people's opinions.
 
-Infrastructure Bias (IB): Based on urbanisation, development, public facilities, or regional accessibility. Including the forest cover and rural areas present in the state or region.
+- Infrastructure Bias (IB): Based on urbanisation, development, public facilities, or regional accessibility. Including the forest cover and rural areas present in the state or region.
 
 **Level 4: State/Region Assignment**
 
