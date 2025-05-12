@@ -123,3 +123,78 @@ This file contains the cleaning of the dataset, where primary cleaning is done, 
 - [LLaMa_3.2_3B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_llama_3.2_3b.py)
 - [Claude](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_claude.py)
 - [Mistral_7B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/sentiment_classification_mistral_7B.py)
+
+## Dataset Annotation 
+
+We have developed a comprehensive annotation framework to understand the nature and intensity of the regional biases. 
+
+**Level 1: Regional Bias vs Non-Regional Bias**
+
+Non-Regional Bias (NRB): Comments that do not express any social bias. (Score: 0)
+
+Regional Bias (RB): Comments reinforcing or propagating social biases about any state based on their languages, caste, culture, economic, and infrastructural development. (Score: 1)
+
+**Level-2: Severity of the Comments**
+
+Mild (Score 1): Slight bias, indirectly reinforced stereotype.
+
+Moderate (Score 2): Clear bias, reinforcing stereotypes with some intent.
+
+Severe (Score 3): Strong bias, explicitly promoting discrimination or prejudice.
+
+**Level 3: Bias Category**
+
+Linguistic Bias (LB): Based on language superiority/inferiority.
+
+Cultural Bias (CB): Based on customs, morals, traditions, festivals, food, and lifestyle.
+
+Economic Bias (EB): Based on the economic status of the state, GDP per capita, financial status, and social class.
+
+Political Bias (PB): The political landscape, ideology, and the effect of politics in shaping people's opinions.
+
+Infrastructure Bias (IB): Based on urbanisation, development, public facilities, or regional accessibility. Including the forest cover and rural areas present in the state or region.
+
+**Level 4: State/Region Assignment**
+
+The stereotypical comments are assigned to a specific region/state that has been targeted.
+
+The annotation process includes two groups. Disagreements were resolved through discussions to reach a consensus. We calculated inter-annotator agreement to ensure the reliability of the annotations.
+
+## Dataset
+
+-[Data](https://drive.google.com/drive/folders/1PISKGiWoKh-D9UPyaMCnirjOaIf2JlI7)
+
+
+## Prompting and Classification Strategies
+
+In the evaluation of the model's understanding of regional biases, we utilised the prompting techniques. This involved the careful curation of instructions for specific tasks into prompts that include context, definitions, and examples. We explored different prompting paradigms:
+
+**Zero-Shot Classification:**
+
+A classification technique that refers to the ability of large language models to perform classification solely based on the instructions and class descriptions provided in the prompt, without any seen examples of the specific task, unlike the fine-tuning technique.
+
+
+- [LLaMa_3.2_3B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/llama_3.2_3b)
+- [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/deepseek_r1_distill_qwen_7b.py)
+- [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/mistral_7b_instruct_v0.3)
+
+**Few-Shot Classification:**
+
+The classification techniques involve the use of a smaller number of examples within the prompt itself. These examples illustrate the desired input-output behaviour for the task. These examples help the model better adapt its pre-trained knowledge to specific nuances in the classification. 
+
+The examples are randomly selected from the annotated dataset, that is, **50 comments tagged regional biases and 50 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
+
+**Few-Shot (Support-100)**
+
+-[Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/deepseek_r1_distill_qwen_1.5b.py)
+-[Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/mistral_7b_instruct_v0.3.py)
+
+
+
+
+
+
+    
+
+
+
