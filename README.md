@@ -1,7 +1,7 @@
 # Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models
 ## Overview
 
-This project aims to analyze and summarize state-wise social biases in India using large language models (LLMs). Leveraging Reddit, Quora, and YouTube data, we extract and analyze public sentiments, classify them, and summarize biases using different LLMs. The goal is to create a dataset that captures state-specific biases and evaluate various LLMs' ability to summarize these biases accurately.
+This project investigates regional social biases in India by leveraging natural language processing and large language models (LLMs). We curated a comprehensive dataset of comments from Reddit, YouTube, and Quora that contain explicit or implicit regional biases toward different Indian states and regions. Through rigorous annotation, classification, and model evaluation, we aim to understand how these biases manifest online and how effectively LLMs can identify them.
 
 ## Project Workflow
 
@@ -23,33 +23,48 @@ Apply a sentiment classifier to each comment to assign a sentiment score.
 
 Categorize comments into positive and negative classes.
 
-**3.  Grouping by State:**
+**3. Multi-level Annotation**
 
-Aggregate comments based on states.
+Level-1: Classify comments as regional bias and non-regional bias.
 
-Maintain sentiment scores to retain polarity information.
+Level-2: Rate the severity of stereotypical comments (mild, moderate, severe)
 
-**4. LLM-Based Summarization:**
+Level-3: Categorize by bias types:
 
-Feed grouped state-wise comments into different LLMs.
+- Linguistic Bias
+- Cultural Bias
+- Economic Bias
+- Political Bias
+- Infrastructure Bias
 
-Summarize the positive and negative biases about each state.
 
-Compare model performance using summarization scores.
+Associate each stereotypical comment with specific target states/regions
 
-**5. Fine-Tuning LLMs:**
+**4. LLM Classification Pipeline**
 
-Use the gathered dataset to fine-tune LLMs.
+Zero-shot Classification:
 
-Improve the models’ understanding of deep-rooted social biases in India.
+Evaluate multiple LLMs' ability to classify biases without examples.Test different prompting strategies to optimize zero-shot performance.
 
-**6. Future Prospects:**
+Few-shot Classification:
 
-Develop a psychometric test to detect unconscious social biases in hiring policies.
+Design effective examples for in-context learning and test varying numbers of examples to determine an optimal few-shot configuration.
 
-Use LLMs to assess personal biases and their impact on decision-making.
+Fine-tuning Approach:
 
-Train LLMs to recognize and counteract subtle biases in language processing.
+Train models on the annotated dataset. Implement cross-validation to ensure robustness. Compare performance across model sizes and architectures.
+
+**5. Performance Evaluation**
+
+Create benchmark metrics to evaluate LLM performance:
+
+Accuracy, Precision, Recall, F1-score
+
+Analyze performance differences across:
+
+- Different Indian states/regions
+- Different bias types
+- Different severity levels
 
 ## Literature Review
 
@@ -67,7 +82,7 @@ Here are some papers I've studied for this project:
 
 This is a list of regional biases in India, categorized into various types of cognitive biases. The information is gathered through an extensive study of news articles and social media discussions, as well as a Google Form circulated among my classmates.
   
-## Dataset 
+## Collected Data
 
 - [Dataset (Google Drive)](https://drive.google.com/drive/folders/1uS5B-y4OAZvb9xHRS7ZrXh5QVyHtik41?usp=drive_link)
 
@@ -140,8 +155,31 @@ The annotation process includes two groups. Disagreements were resolved through 
 
 ## Dataset
 
--[Data](https://drive.google.com/drive/folders/1PISKGiWoKh-D9UPyaMCnirjOaIf2JlI7)
+- [Data](https://drive.google.com/drive/folders/1PISKGiWoKh-D9UPyaMCnirjOaIf2JlI7)
 
+**Level-1**
+
+![Screenshot from 2025-05-13 10-45-09](https://github.com/user-attachments/assets/3bd68850-7c57-479c-8c52-aae4fa454554)
+
+This chart shows the distribution between non-biased comments (7,521) and comments containing regional bias (2,479). The visualization demonstrates that about a quarter of the analyzed comments show some form of regional bias.
+
+**Level-2**
+
+![Screenshot from 2025-05-13 10-45-19](https://github.com/user-attachments/assets/2ccb3686-8eff-49ad-87e2-e3dc711f51c5)
+
+Among biased comments, moderate severity (2) is most prevalent, followed by mild (1), with severe biases (3) being the least common but still significant. This chart visualizes the severity distribution of the comments. The data shows that moderate severity comments (1,367) are most common, followed by mild (884), with severe comments (223) being less frequent but still notable.
+
+**Level-3**
+
+![Screenshot from 2025-05-13 10-46-12](https://github.com/user-attachments/assets/4302b6b8-7fe9-44cd-97f2-a463a431db41)
+
+When bias is present, it most commonly manifests as a single bias type, with declining frequency as the number of simultaneous bias types increases. This visualization shows how many different types of biases appear in comments. Most biased comments contain just one type of bias (1,883), followed by two types (368), three types (156), and four types (60)
+
+**Level-4**
+
+![Screenshot from 2025-05-13 10-30-42](https://github.com/user-attachments/assets/42c23590-8c85-4997-84a1-63acc2621e0b)
+
+The visualisation shows that North India has the highest number of comments (244), followed by Chhattisgarh (183), Bihar (169), and Karnataka (167). The chart displays the top 15 states/regions in descending order, making it easy to understand the distribution of comments across different Indian states and regions.
 
 ## Prompting and Classification Strategies
 
@@ -177,8 +215,8 @@ The examples are randomly selected from the annotated dataset, that is, **50 com
 The examples are randomly selected from the annotated dataset, that is, **75 comments tagged regional biases and 75 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
 
 - [Deepseek_R1_Distill_Qwen_1.5B]
-- [Mistral_7B_instruct_v0.3]
-- [Qwen_2.5_7B_instruct]
+- [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/Mistral_7b_instruct_v0.3.py)
+- [Qwen_2.5_7B_instruct](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/qwen_2.5_7b_instruct.py)
 - [Deepseek_R1_Distill_Qwen_7B]
   
 **Few-Shot (Support-200)**
