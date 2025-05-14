@@ -223,10 +223,10 @@ The examples are randomly selected from the annotated dataset, that is, **75 com
 
 The examples are randomly selected from the annotated dataset, that is, **100 comments tagged regional biases and 100 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
 
-- [Deepseek_R1_Distill_Qwen_1.5B]
-- [Mistral_7B_instruct_v0.3]
-- [Qwen_2.5_7B_instruct]
-- [Deepseek_R1_Distill_Qwen_7B]
+- [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Deepseek_r1_distill_1.5b.py)
+- [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Mistral_7b_instruct_v0.3.py)
+- [Qwen_2.5_7B_instruct](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Qwen_2.5_7b_instruct.py)
+- [Deepseek_R1_Distill_Qwen_7B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Deepseek_r1_distill_7b.py)
 
 
 
