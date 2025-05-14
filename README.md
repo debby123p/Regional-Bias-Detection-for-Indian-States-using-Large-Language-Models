@@ -208,7 +208,7 @@ The examples are randomly selected from the annotated dataset, that is, **50 com
 - [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/deepseek_r1_distill_qwen_1.5b.py)
 - [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/mistral_7b_instruct_v0.3.py)
 - [Qwen_2.5_7B_instruct](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/qwen_2.5_7b_instruct.py)
-- [Deepseek_R1_Distill_Qwen_7B]
+- [Deepseek_R1_Distill_Qwen_7B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/deepseek_r1_distill_7b.py)
 
 **Few-Shot (Support-150)**
 
