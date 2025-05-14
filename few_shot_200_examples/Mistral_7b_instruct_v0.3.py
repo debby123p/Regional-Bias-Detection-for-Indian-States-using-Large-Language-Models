@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-Few-shot classification for regional bias detection using Mistral-7B-Instruct-v0.3
-with 200 examples approach.
-
-Author: Debasmita
-"""
-
 import os
 import sys
 import pandas as pd
