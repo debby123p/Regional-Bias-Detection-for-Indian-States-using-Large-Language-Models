@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-Few-shot classification for regional bias detection using Qwen2.5-7B-Instruct
-with 200 examples approach.
-
-Author: Debasmita
-"""
-
 import os
 import sys
 import pandas as pd
