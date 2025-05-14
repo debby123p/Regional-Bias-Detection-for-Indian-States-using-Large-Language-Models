@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-Few-shot classification for regional bias detection using DeepSeek-R1-Distill-Qwen-1.5B
-with k-nearest examples selection approach.
-
-Author: Debasmita
-"""
-
 import os
 import sys
 import pandas as pd
@@ -25,38 +17,41 @@ import re
 import gc
 from huggingface_hub import login
 
-# Default paths
-DEFAULT_EXAMPLES_PATH = '/DATA2/akash/venvs/debasmita/data/balanced_dataset_200_comments.csv'
-DEFAULT_ANNOTATED_PATH = '/DATA2/akash/venvs/debasmita/data/annotated_experiment_phase_new - Sheet1.csv'
-DEFAULT_OUTPUT_DIR = '/DATA2/akash/venvs/debasmita/results/few_shot_k'
-DEFAULT_CACHE_DIR = '/DATA2/akash/venvs/debasmita/model_cache'
+# Default paths - for development only, will be overridden by arguments or env vars
 DEFAULT_MODEL_NAME = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
-DEFAULT_HF_TOKEN = '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'
 DEFAULT_K_EXAMPLES = 20
-DEFAULT_GPU_ID = 1
+DEFAULT_GPU_ID = 0
 
 def parse_arguments():
-    """A simpler approach to parse arguments with defaults"""
+    """Parse command line arguments with sensible defaults"""
     # Create a new parser
     parser = argparse.ArgumentParser(description='Few-shot learning for regional bias detection')
     
     # Add all arguments with their proper defaults
-    parser.add_argument('--examples_path', type=str, default=DEFAULT_EXAMPLES_PATH,
+    parser.add_argument('--examples_path', type=str, 
+                        default=os.environ.get('EXAMPLES_PATH', 'data/balanced_dataset_200_comments.csv'),
                         help='Path to CSV file with few-shot examples')
-    parser.add_argument('--annotated_path', type=str, default=DEFAULT_ANNOTATED_PATH,
+    parser.add_argument('--annotated_path', type=str, 
+                        default=os.environ.get('ANNOTATED_PATH', 'data/annotated_dataset.csv'),
                         help='Path to CSV file with annotated dataset')
-    parser.add_argument('--output_dir', type=str, default=DEFAULT_OUTPUT_DIR,
+    parser.add_argument('--output_dir', type=str, 
+                        default=os.environ.get('OUTPUT_DIR', 'results/few_shot_k'),
                         help='Directory to save results')
-    parser.add_argument('--cache_dir', type=str, default=DEFAULT_CACHE_DIR,
+    parser.add_argument('--cache_dir', type=str, 
+                        default=os.environ.get('CACHE_DIR', 'model_cache'),
                         help='Directory for model cache')
-    parser.add_argument('--model_name', type=str, default=DEFAULT_MODEL_NAME,
+    parser.add_argument('--model_name', type=str, 
+                        default=os.environ.get('MODEL_NAME', DEFAULT_MODEL_NAME),
                         help='Model name or path')
-    parser.add_argument('--k_examples', type=int, default=DEFAULT_K_EXAMPLES,
+    parser.add_argument('--k_examples', type=int, 
+                        default=int(os.environ.get('K_EXAMPLES', DEFAULT_K_EXAMPLES)),
                         help='Number of examples to use for few-shot learning')
-    parser.add_argument('--gpu_id', type=int, default=DEFAULT_GPU_ID,
+    parser.add_argument('--gpu_id', type=int, 
+                        default=int(os.environ.get('GPU_ID', DEFAULT_GPU_ID)),
                         help='GPU ID to use')
-    parser.add_argument('--hf_token', type=str, default=DEFAULT_HF_TOKEN,
-                        help='HuggingFace token')
+    parser.add_argument('--hf_token', type=str, 
+                        default=os.environ.get('HF_TOKEN', ''),
+                        help='HuggingFace token (recommended to use env var instead)')
     parser.add_argument('--test_limit', type=int, default=None,
                         help='Limit number of test examples')
     parser.add_argument('--save_checkpoints', action='store_true',
@@ -66,9 +61,31 @@ def parse_arguments():
     
     return parser.parse_args()
 
+def create_directory(directory_path, logger=None):
+    """
+    Create directory if it doesn't exist
+    
+    Args:
+        directory_path: Path to create
+        logger: Optional logger for messages
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        os.makedirs(directory_path, exist_ok=True)
+        if logger:
+            logger.info(f"Directory created/verified: {directory_path}")
+        return True
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to create directory {directory_path}: {e}")
+        return False
+
 def setup_logging(output_dir):
     """Set up logging configuration"""
-    os.makedirs(output_dir, exist_ok=True)
+    # Create output directory if it doesn't exist
+    create_directory(output_dir)
     
     log_file = os.path.join(output_dir, f"few_shot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
     
@@ -102,6 +119,15 @@ def load_datasets(examples_path, annotated_path, logger):
     Returns:
         examples_df, test_df (DataFrames)
     """
+    # Check if files exist
+    if not os.path.exists(examples_path):
+        logger.error(f"Examples file not found: {examples_path}")
+        raise FileNotFoundError(f"Examples file not found: {examples_path}")
+        
+    if not os.path.exists(annotated_path):
+        logger.error(f"Annotated dataset file not found: {annotated_path}")
+        raise FileNotFoundError(f"Annotated dataset file not found: {annotated_path}")
+    
     # Load few-shot examples
     logger.info(f"Loading examples from {examples_path}")
     examples_df = pd.read_csv(examples_path)
@@ -176,6 +202,9 @@ def setup_model(model_name, cache_dir, gpu_id, hf_token, logger):
     Returns:
         model, tokenizer, device
     """
+    # Create cache directory
+    create_directory(cache_dir, logger)
+    
     # Set GPU device if specified
     if torch.cuda.is_available():
         os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
@@ -187,7 +216,6 @@ def setup_model(model_name, cache_dir, gpu_id, hf_token, logger):
         logger.info("CUDA not available. Using CPU.")
     
     # Set up cache directory
-    os.makedirs(cache_dir, exist_ok=True)
     os.environ['TRANSFORMERS_CACHE'] = cache_dir
     os.environ['HF_HOME'] = cache_dir
     logger.info(f"Using cache directory: {cache_dir}")
@@ -433,6 +461,11 @@ def batch_predict(model, tokenizer, test_df, examples_df, device, k_examples=20,
     # Get test comments
     test_comments = test_df["Cleaned_Comment"].tolist()
     
+    # Create checkpoint directory if needed
+    if save_checkpoints and output_dir:
+        checkpoint_dir = os.path.join(output_dir, "checkpoints")
+        create_directory(checkpoint_dir, logger)
+    
     # Process each comment
     for i in range(0, len(test_comments)):
         comment = test_comments[i]
@@ -484,7 +517,7 @@ def batch_predict(model, tokenizer, test_df, examples_df, device, k_examples=20,
                 
                 # Use model short name for file naming
                 model_short_name = "deepseek-k-nearest"
-                checkpoint_path = os.path.join(output_dir, f"{model_short_name}_checkpoint_{i+1}.csv")
+                checkpoint_path = os.path.join(output_dir, "checkpoints", f"{model_short_name}_checkpoint_{i+1}.csv")
                 checkpoint_df.to_csv(checkpoint_path, index=False)
                 logger.info(f"Saved checkpoint at {checkpoint_path}")
         
@@ -518,6 +551,10 @@ def save_results(test_df, predictions, raw_outputs, output_dir, logger, model_na
     # Get true labels
     true_labels = test_df['Label'].tolist()
     
+    # Create visualization directory
+    viz_dir = os.path.join(output_dir, "visualizations")
+    create_directory(viz_dir, logger)
+    
     # Save predictions with raw outputs
     results_df = test_df.copy()
     results_df['Predicted'] = predictions
@@ -527,8 +564,8 @@ def save_results(test_df, predictions, raw_outputs, output_dir, logger, model_na
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     predictions_path = os.path.join(output_dir, f"{model_name}_predictions_{timestamp}.csv")
     report_path = os.path.join(output_dir, f"{model_name}_report_{timestamp}.txt")
-    matrix_path = os.path.join(output_dir, f"{model_name}_confusion_matrix_{timestamp}.png")
-    summary_path = os.path.join(output_dir, f"{model_name}_results_summary_{timestamp}.png")
+    matrix_path = os.path.join(viz_dir, f"{model_name}_confusion_matrix_{timestamp}.png")
+    summary_path = os.path.join(viz_dir, f"{model_name}_results_summary_{timestamp}.png")
     
     # Save predictions CSV
     results_df.to_csv(predictions_path, index=False)
@@ -619,13 +656,21 @@ def main():
     # Parse arguments
     args = parse_arguments()
     
+    # Create required directories
+    for directory in [args.output_dir, args.cache_dir]:
+        create_directory(directory)
+    
     # Set up logging
     logger = setup_logging(args.output_dir)
     
     # Log arguments
     logger.info("Arguments:")
     for arg, value in vars(args).items():
-        logger.info(f"  {arg}: {value}")
+        # Don't log the token for security
+        if arg == 'hf_token':
+            logger.info(f"  {arg}: {'*' * 8 if value else 'Not provided'}")
+        else:
+            logger.info(f"  {arg}: {value}")
     
     # Start timing
     start_time = time.time()
@@ -681,7 +726,7 @@ def main():
     
     except Exception as e:
         logger.error(f"Error in main execution: {e}", exc_info=True)
-        raise
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
