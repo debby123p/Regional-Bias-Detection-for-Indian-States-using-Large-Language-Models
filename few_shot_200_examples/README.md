@@ -29,12 +29,7 @@ The implementation supports multiple language models, including:
 
 -CUDA-compatible GPU
 
-
-## Installation
-
-Clone this repository
-
-Dataset Format
+## Dataset Format
 
 The code expects CSV files with the following structure:
 
