@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""
-Few-shot classification for regional bias detection using DeepSeek-R1-Distill-Qwen-7B
-with 150 examples approach (75 examples per class).
-
-Author: Debasmita
-"""
-
 import os
 import sys
 import pandas as pd
