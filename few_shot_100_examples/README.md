@@ -36,6 +36,8 @@ The code expects CSV files with the following structure:
 
 - Example dataset (100_examples_few_shot_classification_dataset.csv): Contains 100 examples with balanced classes (50 regional bias, 50 non-regional bias)
   
+  [few_shot_support_100](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_100_examples/few_shot_support_100%20.csv)
+  
 - Test dataset (annotated_dataset.csv): Contains comments to be classified
 
 ## Output
