@@ -247,7 +247,7 @@ Classification: [regional_bias/non_regional_bias] [/INST]
                 "full_response": response
             }
 
-def save_iteration_results(iteration_results, output_dir, iteration_num, timestamp):
+def save_iteration_results(iteration_results, output_dir, iteration_num, timestamp, model_prefix="mistral"):
     """
     Save results for a single iteration
     
@@ -256,6 +256,7 @@ def save_iteration_results(iteration_results, output_dir, iteration_num, timesta
         output_dir: Directory to save results
         iteration_num: Current iteration number
         timestamp: Timestamp for file naming
+        model_prefix: Model name prefix for file naming (default: "mistral")
     
     Returns:
         Path to the saved predictions CSV file
@@ -264,13 +265,13 @@ def save_iteration_results(iteration_results, output_dir, iteration_num, timesta
     os.makedirs(output_dir, exist_ok=True)
     
     # Save as JSON
-    json_file = os.path.join(output_dir, f"mistral_iteration_{iteration_num}_results_{timestamp}.json")
+    json_file = os.path.join(output_dir, f"{model_prefix}_iteration_{iteration_num}_results_{timestamp}.json")
     with open(json_file, 'w') as f:
         json.dump(iteration_results, f, indent=2)
     
     # Save as detailed CSV
     df_results = pd.DataFrame(iteration_results)
-    csv_file = os.path.join(output_dir, f"mistral_iteration_{iteration_num}_detailed_{timestamp}.csv")
+    csv_file = os.path.join(output_dir, f"{model_prefix}_iteration_{iteration_num}_detailed_{timestamp}.csv")
     df_results.to_csv(csv_file, index=False)
     
     # Save predictions only CSV
@@ -285,7 +286,7 @@ def save_iteration_results(iteration_results, output_dir, iteration_num, timesta
         })
     
     df_predictions = pd.DataFrame(predictions_data)
-    predictions_csv = os.path.join(output_dir, f"mistral_iteration_{iteration_num}_predictions_{timestamp}.csv")
+    predictions_csv = os.path.join(output_dir, f"{model_prefix}_iteration_{iteration_num}_predictions_{timestamp}.csv")
     df_predictions.to_csv(predictions_csv, index=False)
     
     logger.info(f"Iteration {iteration_num} results saved:")
@@ -295,7 +296,7 @@ def save_iteration_results(iteration_results, output_dir, iteration_num, timesta
     
     return predictions_csv
 
-def generate_evaluation_report(all_iterations_predictions, ground_truth, all_iterations_results, output_dir):
+def generate_evaluation_report(all_iterations_predictions, ground_truth, all_iterations_results, output_dir, model_name="mistral", model_prefix="mistral"):
     """
     Generate comprehensive evaluation report for multiple iterations
     
@@ -304,6 +305,8 @@ def generate_evaluation_report(all_iterations_predictions, ground_truth, all_ite
         ground_truth: List of ground truth labels
         all_iterations_results: List of result lists for each iteration
         output_dir: Directory to save evaluation results
+        model_name: Full model name used for report headers
+        model_prefix: Model name prefix for file naming (default: "mistral")
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
@@ -323,9 +326,9 @@ def generate_evaluation_report(all_iterations_predictions, ground_truth, all_ite
     conf_matrix = confusion_matrix(ground_truth, final_predictions)
     
     # Save classification report as text file
-    report_file = os.path.join(output_dir, f"classification_report_mistral_{timestamp}.txt")
+    report_file = os.path.join(output_dir, f"classification_report_{model_prefix}_{timestamp}.txt")
     with open(report_file, 'w') as f:
-        f.write("=== Classification Report - Mistral (Multiple Iterations with Majority Voting) ===\n\n")
+        f.write(f"=== Classification Report - {model_name} (Multiple Iterations with Majority Voting) ===\n\n")
         f.write(f"Timestamp: {timestamp}\n")
         f.write(f"Total Samples: {len(final_predictions)}\n")
         f.write(f"Number of Iterations: {len(all_iterations_predictions)}\n\n")
@@ -360,7 +363,7 @@ def generate_evaluation_report(all_iterations_predictions, ground_truth, all_ite
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     plt.tight_layout()
-    confusion_matrix_file = os.path.join(viz_dir, f"confusion_matrix_mistral_{timestamp}.png")
+    confusion_matrix_file = os.path.join(viz_dir, f"confusion_matrix_{model_prefix}_{timestamp}.png")
     plt.savefig(confusion_matrix_file, dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -379,7 +382,7 @@ def generate_evaluation_report(all_iterations_predictions, ground_truth, all_ite
             color=['green', 'red'])
     plt.title(f'Iteration Agreement Rate: {agreement_rate:.2%}')
     plt.ylabel('Number of Samples')
-    agreement_file = os.path.join(viz_dir, f"iteration_agreement_mistral_{timestamp}.png")
+    agreement_file = os.path.join(viz_dir, f"iteration_agreement_{model_prefix}_{timestamp}.png")
     plt.savefig(agreement_file, dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -412,7 +415,7 @@ def generate_evaluation_report(all_iterations_predictions, ground_truth, all_ite
     for i, count in enumerate(pred_counts):
         plt.text(i + width/2, count + 5, str(count), ha='center')
     
-    distribution_file = os.path.join(viz_dir, f"class_distribution_mistral_{timestamp}.png")
+    distribution_file = os.path.join(viz_dir, f"class_distribution_{model_prefix}_{timestamp}.png")
     plt.savefig(distribution_file, dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -435,7 +438,7 @@ def generate_evaluation_report(all_iterations_predictions, ground_truth, all_ite
         'iteration_agreement_rate': agreement_rate
     }
     
-    json_report_file = os.path.join(output_dir, f"evaluation_report_mistral_{timestamp}.json")
+    json_report_file = os.path.join(output_dir, f"evaluation_report_{model_prefix}_{timestamp}.json")
     with open(json_report_file, 'w') as f:
         json.dump(report_data, f, indent=2)
     
