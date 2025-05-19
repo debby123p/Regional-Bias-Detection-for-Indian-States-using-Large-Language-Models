@@ -30,9 +30,7 @@ Requirements
 
 -CUDA-compatible GPU
 
-## Installation
-
-Dataset Format
+## Dataset Format
 
 The code expects CSV files with the following structure:
 
