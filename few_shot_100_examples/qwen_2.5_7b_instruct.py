@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Few-shot classification for regional bias detection using Qwen/Qwen2.5-7B-Instruct
+with 100 examples approach (50 examples per class).
+"""
+
 import os
 import sys
 import pandas as pd
@@ -48,7 +54,7 @@ def parse_arguments():
                         help='GPU ID to use (defaults to GPU 0)')
     parser.add_argument('--hf_token', type=str, 
                         default=os.environ.get('HF_TOKEN', ''),
-                        help='HuggingFace token (recommended to use env var instead)')
+                        help='HuggingFace token (required - set via env var or command line)')
     parser.add_argument('--random_seed', type=int,
                         default=int(os.environ.get('RANDOM_SEED', DEFAULT_RANDOM_SEED)),
                         help='Random seed for reproducibility')
