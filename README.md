@@ -101,7 +101,7 @@ The annotation process includes two groups. Disagreements were resolved through 
 
 - [Data](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/Miscellaneous/Regional_bias_data%20.csv)
 
-- The breakdown of the data among social media platforms is the following:
+The breakdown of the data among social media platforms is the following:
 
 - From Reddit(9000 comments)
 
@@ -109,28 +109,32 @@ The annotation process includes two groups. Disagreements were resolved through 
 
 **Level-1**
 
-![Screenshot](https://github.com/user-attachments/assets/ba4fe26b-d17f-41d8-822b-9da3f3879e62)
+![image](https://github.com/user-attachments/assets/ba4fe26b-d17f-41d8-822b-9da3f3879e62)
 
 This chart shows the distribution between non-biased comments (7,580) and comments containing regional bias (2,420). The visualisation demonstrates that about a quarter of the analysed comments show some form of regional bias.
 
 **Level-2**
 
-![Screenshot](https://github.com/user-attachments/assets/fa4d4ce6-8e41-4220-b755-0cdca0884499)
+![image](https://github.com/user-attachments/assets/fa4d4ce6-8e41-4220-b755-0cdca0884499)
 
 Among biased comments, moderate severity (2) is most prevalent, followed by mild (1), with severe biases (3) being the least common but still significant. This chart visualizes the severity distribution of the comments. The data shows that moderate severity comments (1,328) are most common, followed by mild (872), with severe comments (220) being less frequent but still notable.
 
 **Level-3**
 
-![Screenshot](https://github.com/user-attachments/assets/08f9beb9-eb1c-473f-b6d6-0147abf0b39e)
+![image](https://github.com/user-attachments/assets/08f9beb9-eb1c-473f-b6d6-0147abf0b39e)
 
 
-When bias is present, it most commonly manifests as a single bias type, with declining frequency as the number of simultaneous bias types increases. This visualization shows how many different types of biases appear in comments. Most biased comments contain just one type of bias (1,883), followed by two types (368), three types (156), and four types (60)
+When bias is present, it most commonly manifests as a single bias type, with declining frequency as the number of simultaneous bias types increases. This visualisation shows how many different types of biases appear in comments. Most biased comments contain just one type of bias (1,883), followed by two types (368), three types (156), and four types (60)
 
 **Level-4**
 
-![Screenshot](https://github.com/user-attachments/assets/42c23590-8c85-4997-84a1-63acc2621e0b)
+![image](https://github.com/user-attachments/assets/d61fa854-ebcc-4e19-88fc-35d89d9da870)
 
-The visualisation shows that North India has the highest number of comments (244), followed by Chhattisgarh (183), Bihar (169), and Karnataka (167). The chart displays the top 15 states/regions in descending order, making it easy to understand the distribution of comments across different Indian states and regions.
+The visualisation shows that Chhattisgarh (183) has the highest number of comments, Bihar (169), and Karnataka (166). The chart displays the top 15 states/regions in descending order, making it easy to understand the distribution of comments across different Indian states and regions.
+
+![image](https://github.com/user-attachments/assets/eed151ef-e404-452e-9f0e-aeea9bda34c6)
+
+The distribution shows North and South India leading with the highest engagement (716 and 677 comments, respectively), while Northeast India has the lowest participation (117 comments).
 
 ## Prompting and Classification Strategies
 
@@ -141,12 +145,12 @@ In the evaluation of the model's understanding of regional biases, we utilised t
 A classification technique that refers to the ability of large language models to perform classification solely based on the instructions and class descriptions provided in the prompt, without any seen examples of the specific task, unlike the fine-tuning technique.
 
 
-- [LLaMa_3.2_3B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/llama_3.2_3b)
+- [LLaMa_3.2_3B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/zero_shot_models/llama_3.2_3b.py)
 - [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/deepseek_r1_distill_qwen_7b.py)
-- [Gemma_3_4B_it]
-- [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/zero_shot_models/mistral_7b_instruct_v0.3)
-- [Qwen_2.5_7B_instruct]
-- [Deepseek_R1_Distill_Qwen_7B]
+- [Gemma_3_4B_it](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/zero_shot_models/gemma_3_4b_it.py)
+- [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/zero_shot_models/mistral_7b_instruct_v0.3.py)
+- [Qwen_2.5_7B_instruct](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/zero_shot_models/qwen_2.5_7b_instruct.py)
+- [Deepseek_R1_Distill_Qwen_7B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/zero_shot_models/deepseek_r1_distill_qwen_7b.py)
 
 **Few-Shot Classification:**
 
@@ -158,14 +162,14 @@ The examples are randomly selected from the annotated dataset, that is, **50 com
 
 - [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/deepseek_r1_distill_qwen_1.5b.py)
 - [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/mistral_7b_instruct_v0.3.py)
-- [Qwen_2.5_7B_instruct](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/qwen_2.5_7b_instruct.py)
+- [Qwen_2.5_7B_instruct](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_100_examples/qwen_2.5_7b_instruct.py)
 - [Deepseek_R1_Distill_Qwen_7B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/deepseek_r1_distill_7b.py)
 
 **Few-Shot (Support-150)**
 
 The examples are randomly selected from the annotated dataset, that is, **75 comments tagged regional biases and 75 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
 
-- [Deepseek_R1_Distill_Qwen_1.5B]
+- [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/deepseek_r1_distill_qwen_1.5b.py)
 - [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/Mistral_7b_instruct_v0.3.py)
 - [Qwen_2.5_7B_instruct](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/qwen_2.5_7b_instruct.py)
 - [Deepseek_R1_Distill_Qwen_7B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/deepseek_r1_distill_7b.py)
