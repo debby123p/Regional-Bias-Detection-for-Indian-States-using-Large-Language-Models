@@ -35,6 +35,8 @@ The implementation supports multiple language models, including:
 The code expects CSV files with the following structure:
 
 - Example dataset (150_examples_few_shot_classification_dataset.csv): Contains 150 examples with balanced classes (75 regional bias, 75 non-regional bias)
+  
+[few_shot_support_150](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/few_shot_support_150.csv)
 
 - Test dataset (annotated_dataset.csv): Contains comments to be classified
 
