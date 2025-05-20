@@ -4,681 +4,773 @@ import pandas as pd
 import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score
+from tqdm import tqdm
+import json
+from datetime import datetime
+import gc
+from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
-import time
+from huggingface_hub import login
+from collections import Counter
 import logging
 import argparse
-from datetime import datetime
-from huggingface_hub import login
-import re
-import gc
+from pathlib import Path
 
-# Default configurations - these will be overridden by command-line args or env vars
-DEFAULT_MODEL_NAME = 'mistralai/Mistral-7B-Instruct-v0.3'
-DEFAULT_GPU_ID = 1  # This script uses GPU 1 by default, different from others
-DEFAULT_RANDOM_SEED = 42
-DEFAULT_MAX_LENGTH = 4096  # Smaller context window for 150 examples
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def parse_arguments():
-    """Parse command line arguments with sensible defaults"""
-    parser = argparse.ArgumentParser(description='Few-shot learning for regional bias detection with Mistral (150 examples)')
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Zero-shot binary classification for regional bias detection using Mistral models')
     
-    parser.add_argument('--examples_path', type=str, 
-                        default=os.environ.get('EXAMPLES_PATH', 'data/150_examples_few_shot_classification_dataset.csv'),
-                        help='Path to CSV file with 150 few-shot examples')
-    parser.add_argument('--test_path', type=str, 
-                        default=os.environ.get('TEST_PATH', 'data/annotated_dataset.csv'),
-                        help='Path to CSV file with test dataset')
-    parser.add_argument('--output_dir', type=str, 
-                        default=os.environ.get('OUTPUT_DIR', 'results/mistral_few_shot_150'),
-                        help='Directory to save results')
-    parser.add_argument('--cache_dir', type=str, 
-                        default=os.environ.get('CACHE_DIR', 'model_cache'),
-                        help='Directory for model cache')
-    parser.add_argument('--log_dir', type=str, 
-                        default=os.environ.get('LOG_DIR', 'logs'),
-                        help='Directory for log files')
-    parser.add_argument('--model_name', type=str, 
-                        default=os.environ.get('MODEL_NAME', DEFAULT_MODEL_NAME),
+    # Data and output paths
+    parser.add_argument('--data-path', type=str, required=True,
+                        help='Path to the annotated dataset CSV file')
+    parser.add_argument('--output-dir', type=str, default='results/mistral/',
+                        help='Directory to save output files') # Specify your output directory here
+    parser.add_argument('--cache-dir', type=str, default=None,
+                        help='Directory for model cache') # Specify cache directory here if needed
+    parser.add_argument('--log-dir', type=str, default=None,
+                        help='Directory for log files (defaults to output_dir)')
+    
+    # Model configuration
+    parser.add_argument('--model-name', type=str, 
+                        default='mistralai/Mistral-7B-Instruct-v0.3',
                         help='Model name or path')
-    parser.add_argument('--gpu_id', type=int, 
-                        default=int(os.environ.get('GPU_ID', DEFAULT_GPU_ID)),
-                        help='GPU ID to use (defaults to GPU 1)')
-    parser.add_argument('--hf_token', type=str, 
-                        default=os.environ.get('HF_TOKEN', ''),
-                        help='HuggingFace token (recommended to use env var instead)')
-    parser.add_argument('--random_seed', type=int,
-                        default=int(os.environ.get('RANDOM_SEED', DEFAULT_RANDOM_SEED)),
-                        help='Random seed for reproducibility')
-    parser.add_argument('--test_limit', type=int, default=None,
-                        help='Limit number of test examples (for testing)')
-    parser.add_argument('--checkpoint_interval', type=int, default=10,
-                        help='Interval for saving checkpoints')
-    parser.add_argument('--max_length', type=int, 
-                        default=int(os.environ.get('MAX_LENGTH', DEFAULT_MAX_LENGTH)),
-                        help='Maximum context length for tokenization')
+    parser.add_argument('--gpu-id', type=int, default=0,
+                        help='GPU ID to use for inference')
+    parser.add_argument('--hf-token', type=str, default=None,
+                        help='HuggingFace token for accessing gated models')
     
-    return parser.parse_args()
+    # Memory optimization
+    parser.add_argument('--quantization', type=str, default='none', 
+                        choices=['4bit', '8bit', 'none'],
+                        help='Quantization type (4bit, 8bit, or none)')
+    parser.add_argument('--max-gpu-memory', type=str, default=None,
+                        help='Maximum GPU memory to use (e.g., "16GB")')
+    parser.add_argument('--cpu-offload', action='store_true', 
+                        help='Enable CPU offloading for parts of the model')
+    
+    # Execution parameters
+    parser.add_argument('--num-iterations', type=int, default=3,
+                        help='Number of classification iterations to run')
+    parser.add_argument('--max-samples', type=int, default=None,
+                        help='Maximum number of samples to process (for testing)')
+    parser.add_argument('--max-length', type=int, default=2048,
+                        help='Maximum context length for tokenizer')
+    parser.add_argument('--max-new-tokens', type=int, default=300,
+                        help='Maximum number of new tokens to generate')
+    
+    args = parser.parse_args()
+    return args
 
-def create_directory(directory_path, logger=None):
-    """
-    Create directory if it doesn't exist
+def setup_environment(args):
+    """Set up environment variables and directories"""
+    # Set GPU device
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_id)
     
-    Args:
-        directory_path: Path to create
-        logger: Optional logger for messages
-    """
-    try:
-        os.makedirs(directory_path, exist_ok=True)
-        if logger:
-            logger.info(f"Directory created/verified: {directory_path}")
-    except Exception as e:
-        if logger:
-            logger.error(f"Failed to create directory {directory_path}: {e}")
-        raise
-
-def setup_logging(log_dir, model_name):
-    """Set up logging configuration"""
-    # Create output directory if it doesn't exist
-    create_directory(log_dir)
+    # Set cache directory if provided
+    if args.cache_dir:
+        os.environ['HF_HOME'] = args.cache_dir
+        os.environ['TRANSFORMERS_CACHE'] = args.cache_dir
+        os.makedirs(args.cache_dir, exist_ok=True)
+        logger.info(f"Using cache directory: {args.cache_dir}")
     
-    log_file = os.path.join(log_dir, f"{model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    # Create output and log directories
+    os.makedirs(args.output_dir, exist_ok=True)
     
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler()
-        ]
-    )
+    log_dir = args.log_dir if args.log_dir else args.output_dir
+    os.makedirs(log_dir, exist_ok=True)
     
-    return logging.getLogger(__name__)
-
-def clean_text(text):
-    """Clean and normalize text for model input."""
-    text = str(text).lower()
-    text = re.sub(r"http\S+", "", text)  # Remove URLs
-    text = re.sub(r"[^a-zA-Z0-9\s]", "", text)  # Remove special characters
-    text = re.sub(r"\s+", " ", text).strip()  # Remove extra spaces
-    return text
-
-def load_datasets(examples_path, test_path, logger, test_limit=None):
-    """
-    Load the example and test datasets
+    # Set up file logger
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    model_prefix = args.model_name.split('/')[-1].lower() if '/' in args.model_name else args.model_name.lower()
+    log_file = os.path.join(log_dir, f"{model_prefix}_classification_{timestamp}.log")
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logger.addHandler(file_handler)
     
-    Args:
-        examples_path: Path to examples CSV
-        test_path: Path to test CSV
-        logger: Logger instance
-        test_limit: Optional limit for test dataset size
-        
-    Returns:
-        examples_df, test_df (DataFrames)
-    """
-    # Check if files exist
-    if not os.path.exists(examples_path):
-        logger.error(f"Examples file not found: {examples_path}")
-        raise FileNotFoundError(f"Examples file not found: {examples_path}")
-        
-    if not os.path.exists(test_path):
-        logger.error(f"Test dataset file not found: {test_path}")
-        raise FileNotFoundError(f"Test dataset file not found: {test_path}")
+    # Log system information
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"PyTorch version: {torch.__version__}")
     
-    # Load few-shot examples - this contains our 150 examples (75 each class)
-    logger.info(f"Loading examples from {examples_path}")
-    examples_df = pd.read_csv(examples_path)
-    
-    # Load full dataset for testing
-    logger.info(f"Loading test dataset from {test_path}")
-    test_df = pd.read_csv(test_path)
-    
-    # Process the datasets
-    logger.info(f"Loaded {len(examples_df)} examples from {examples_path}")
-    logger.info(f"Loaded {len(test_df)} total test comments from {test_path}")
-    
-    # Verify class distribution in examples
-    bias_examples = examples_df[examples_df['Level-1'] >= 1]
-    non_bias_examples = examples_df[examples_df['Level-1'] == 0]
-    logger.info(f"Found {len(bias_examples)} regional bias examples and {len(non_bias_examples)} non-regional bias examples")
-    
-    # Check if we have the expected number (75 of each)
-    expected_count = 75
-    if len(bias_examples) != expected_count or len(non_bias_examples) != expected_count:
-        logger.warning(f"Expected {expected_count} examples of each class, but found {len(bias_examples)} bias and {len(non_bias_examples)} non-bias examples")
-    
-    # Ensure there's no overlap between examples and test data
-    examples_comments = set(examples_df['Comment'].str.strip())
-    test_df = test_df[~test_df['Comment'].str.strip().isin(examples_comments)]
-    logger.info(f"After removing overlapping comments, {len(test_df)} test comments remain")
-    
-    # Clean comments
-    logger.info("Cleaning comment text...")
-    test_df["Cleaned_Comment"] = test_df["Comment"].apply(clean_text)
-    examples_df["Cleaned_Comment"] = examples_df["Comment"].apply(clean_text)
-    
-    # Apply test limit if specified
-    if test_limit is not None and test_limit > 0:
-        logger.info(f"Limiting test set to {test_limit} examples")
-        test_df = test_df.head(test_limit)
-    
-    return examples_df, test_df
-
-def create_few_shot_prompt(examples_df, comment, random_seed=42):
-    """
-    Create a prompt for few-shot learning with examples and the target comment.
-    Uses all 150 examples from the example dataset.
-    Adapted for Mistral-7B-Instruct-v0.3 format.
-    
-    Args:
-        examples_df: DataFrame with 150 example comments
-        comment: The comment to classify
-        random_seed: Random seed for shuffling examples
-        
-    Returns:
-        Formatted prompt string
-    """
-    # Combine all examples and shuffle
-    all_examples = examples_df.copy()
-    all_examples = all_examples.sample(frac=1, random_state=random_seed)  # Shuffle all examples
-    
-    # Create the prompt - Mistral chat format
-    # Mistral uses <s>[INST] ... [/INST] ... </s> format
-    prompt = "<s>[INST] "
-    prompt += "You are an expert in identifying regional biases in comments about Indian states and regions. "
-    prompt += "Task: Classify if the comment contains regional bias related to Indian states or regions.\n\n"
-    prompt += "Instructions:\n"
-    prompt += "- Regional Bias (1): Comments that contain stereotypes, prejudices, or biases about specific Indian states or regions.\n"
-    prompt += "- Non-Regional Bias (0): Comments that don't contain regional stereotypes or biases about Indian states.\n\n"
-    prompt += "Examples:\n"
-    
-    for i, row in all_examples.iterrows():
-        # Convert Level-1 to binary classification (0 or 1)
-        classification = 1 if row['Level-1'] >= 1 else 0
-        
-        prompt += f"Comment: \"{row['Cleaned_Comment']}\"\n"
-        prompt += f"Classification: {classification}\n\n"
-    
-    prompt += f"Now classify this comment:\n\"{comment}\"\nClassification: [/INST] "
-    
-    return prompt
-
-def setup_model(model_name, cache_dir, gpu_id, hf_token, logger):
-    """
-    Load model and tokenizer with optimized settings
-    
-    Args:
-        model_name: Model name or path 
-        cache_dir: Directory for model cache
-        gpu_id: GPU ID to use
-        hf_token: HuggingFace token
-        logger: Logger instance
-        
-    Returns:
-        model, tokenizer, device
-    """
-    # Create cache directory
-    create_directory(cache_dir, logger)
-    
-    # Set environment variables for caching
-    os.environ["TRANSFORMERS_CACHE"] = cache_dir
-    os.environ["HF_HOME"] = cache_dir
-    os.environ["HF_DATASETS_CACHE"] = cache_dir
-    logger.info(f"Using cache directory: {cache_dir}")
-    
-    # Set GPU device if specified
+    # Log GPU information
     if torch.cuda.is_available():
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
-        torch.cuda.set_device(0)  # After setting CUDA_VISIBLE_DEVICES, we use device 0
-        device = torch.device("cuda:0")
-        logger.info(f"Using GPU {gpu_id}: {torch.cuda.get_device_name(0)}")
-        logger.info(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+        logger.info(f"Using GPU {args.gpu_id}: {torch.cuda.get_device_name(0)}")
+        logger.info(f"Total GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
     else:
-        device = torch.device("cpu")
-        logger.info("CUDA not available. Using CPU.")
-    
-    # Clear cache before loading model
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    
-    # Login to HuggingFace if token provided
-    if hf_token:
-        login(token=hf_token)
-        logger.info("Logged in to HuggingFace")
-    
-    logger.info(f"Loading model: {model_name}")
-    start_time = time.time()
-    
-    try:
-        # Configure tokenizer - Mistral has specific tokenizer settings
-        tokenizer_kwargs = {}
+        logger.warning("No GPU available! This process will be extremely slow.")
+
+class RegionalBiasClassifier:
+    def __init__(self, model_name="mistralai/Mistral-7B-Instruct-v0.3", 
+                 cache_dir=None, hf_token=None, quantization="none", 
+                 max_gpu_memory=None, cpu_offload=False):
+        """Initialize the classifier with the specified model"""
+        logger.info(f"Initializing {model_name}")
+        if torch.cuda.is_available():
+            logger.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+        else:
+            logger.warning("CUDA not available. Using CPU (this will be very slow).")
         
-        if hf_token:
-            tokenizer_kwargs['token'] = hf_token
+        # Clear GPU memory before loading
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        gc.collect()
+        
+        # Configure tokenizer
+        tokenizer_kwargs = {
+            'padding_side': 'left'  # Better for decoding-only models
+        }
+        
         if cache_dir:
             tokenizer_kwargs['cache_dir'] = cache_dir
+        if hf_token:
+            tokenizer_kwargs['token'] = hf_token
         
-        tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
+        # Load tokenizer
+        logger.info("Loading tokenizer...")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
         
-        # Ensure tokenizer has padding token - important for Mistral
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
+        # Set pad token if not available
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        # Configure quantization - using 8-bit for 150 examples scenario
-        quantization_config = BitsAndBytesConfig(
-            load_in_8bit=True,           # 8-bit quantization for better quality
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_compute_dtype=torch.float16
-        )
-        
-        # Load model - Mistral specific settings
+        # Configure model parameters
         model_kwargs = {
-            'quantization_config': quantization_config,
+            'torch_dtype': torch.float16,
             'low_cpu_mem_usage': True,
         }
         
-        if hf_token:
-            model_kwargs['token'] = hf_token
         if cache_dir:
             model_kwargs['cache_dir'] = cache_dir
+        if hf_token:
+            model_kwargs['token'] = hf_token
         
+        # Configure device mapping and memory limits
         if torch.cuda.is_available():
-            model_kwargs['device_map'] = "auto"
+            # Compute optimal memory limit
+            available_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+            if max_gpu_memory:
+                # If specified as string with unit (e.g., "16GB"), extract the number
+                if isinstance(max_gpu_memory, str) and "GB" in max_gpu_memory:
+                    max_memory = float(max_gpu_memory.replace("GB", ""))
+                else:
+                    max_memory = float(max_gpu_memory)
+                
+                # Ensure we don't exceed available memory
+                max_memory = min(max_memory, available_memory * 0.9)  # Leave some buffer
+            else:
+                # Use 85% of available memory by default
+                max_memory = available_memory * 0.85
+            
+            # Format for model loading
+            max_memory_str = f"{int(max_memory)}GB"
+            logger.info(f"Setting max GPU memory usage to {max_memory_str}")
+            
+            # Set device map to force everything on GPU if possible
+            model_kwargs['device_map'] = {'': 0}  # Force to GPU
+            model_kwargs['max_memory'] = {0: max_memory_str}
         
-        # Load the model
-        model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
-        
-        # Set to evaluation mode
-        model.eval()
-        
-        elapsed_time = time.time() - start_time
-        logger.info(f"Model loaded in {elapsed_time:.2f} seconds")
-        
-        return model, tokenizer, device
-        
-    except Exception as e:
-        logger.error(f"Error loading model: {e}")
-        raise
-
-def predict_with_model(model, tokenizer, prompt, device, max_length=4096, max_tokens=10, logger=None):
-    """
-    Generate prediction using model with enhanced context handling.
-    
-    Args:
-        model: The model
-        tokenizer: The tokenizer for the model
-        prompt: Input prompt text
-        device: Device to use
-        max_length: Maximum context length for tokenization
-        max_tokens: Maximum number of tokens to generate
-        logger: Logger instance for detailed logging
-        
-    Returns:
-        Predicted class (0 or 1), raw_output
-    """
-    try:
-        # Tokenize the prompt with truncation to ensure it fits in context window
-        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_length).to(device)
-        
-        # Log token count if logger provided
-        if logger and logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Tokenized prompt length: {inputs['input_ids'].shape[1]} tokens")
-        
-        # Generate response - Mistral specific generation parameters
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=max_tokens,
-                temperature=0.1,  # Low temperature for more deterministic outputs
-                do_sample=False,  # Don't sample for deterministic generation
-                num_beams=1,      # Simple greedy decoding for Mistral with 150 examples
-                pad_token_id=tokenizer.pad_token_id
+        # Add quantization if requested
+        if quantization == "4bit":
+            logger.info("Using 4-bit quantization")
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16,
+                llm_int8_enable_fp32_cpu_offload=cpu_offload
             )
-        
-        # Decode the generated text
-        full_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        # Extract just the model's response (after our prompt) - Mistral specific
-        response_marker = "[/INST]"
-        if response_marker in full_output:
-            generated_text = full_output.split(response_marker, 1)[1].strip()
+            model_kwargs['quantization_config'] = bnb_config
+        elif quantization == "8bit":
+            logger.info("Using 8-bit quantization")
+            bnb_config = BitsAndBytesConfig(
+                load_in_8bit=True,
+                bnb_8bit_use_double_quant=True,
+                bnb_8bit_compute_dtype=torch.float16,
+                llm_int8_enable_fp32_cpu_offload=cpu_offload
+            )
+            model_kwargs['quantization_config'] = bnb_config
         else:
-            # Fallback if we can't find the marker
-            generated_text = full_output[-50:].strip()  # Just get the end
+            logger.info("Using float16 precision (no quantization)")
         
-        # Log full output if logger provided
-        if logger and logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Generated text: {generated_text}")
-        
-        # Clear tensors to prevent OOM
-        del inputs, outputs
+        # Clear memory before model loading
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        gc.collect()
         
-        # Look for explicit "1" or "0" at the beginning of the response - Mistral tends to be direct
-        if generated_text.startswith("1") or generated_text == "1":
-            return 1, full_output
-        elif generated_text.startswith("0") or generated_text == "0":
-            return 0, full_output
+        # Load model
+        logger.info("Loading model...")
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
         
-        # If we don't have a clear number at the start, check the entire response
-        if "1" in generated_text and not "0" in generated_text:
-            return 1, full_output
-        elif "0" in generated_text and not "1" in generated_text:
-            return 0, full_output
-        elif "regional bias" in generated_text.lower() or "bias" in generated_text.lower():
-            return 1, full_output
-        elif "non-regional" in generated_text.lower() or "no bias" in generated_text.lower():
-            return 0, full_output
+        # Ensure model is in evaluation mode
+        self.model.eval()
         
-        # Default to non-regional bias if we can't determine
-        if logger:
-            logger.warning(f"Could not determine clear classification, using default 0. Response: {generated_text}")
-        return 0, full_output
-        
-    except Exception as e:
-        if logger:
-            logger.error(f"Error in prediction: {e}")
-        return 0, f"ERROR: {str(e)}"  # Default to the most common class if there's an error
+        # Log memory usage
+        if torch.cuda.is_available():
+            logger.info(f"Model loaded. Memory allocated: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+    
+    def classify_with_cot(self, text, max_length=2048, max_new_tokens=300):
+        """Classify using Chain-of-Thought prompting for better reasoning"""
+        cot_prompt = f"""[INST] You are an expert in identifying regional biases in comments about Indian states and regions. 
+Your task is to determine whether a comment contains regional bias or not.
 
-def batch_predict(model, tokenizer, test_df, examples_df, device, max_length=4096, random_seed=42, 
-                 checkpoint_interval=10, output_dir=None, logger=None):
-    """
-    Process comments in batches for inference with improved pacing
-    
-    Args:
-        model: The model
-        tokenizer: The tokenizer
-        test_df: DataFrame with test data
-        examples_df: DataFrame with examples
-        device: Device to use
-        max_length: Maximum context length
-        random_seed: Random seed for reproducibility
-        checkpoint_interval: Interval for saving checkpoints
-        output_dir: Directory to save checkpoints
-        logger: Logger instance
-        
-    Returns:
-        predictions, raw_outputs
-    """
-    predictions = []
-    raw_outputs = []
-    
-    # Get test comments
-    test_comments = test_df["Cleaned_Comment"].tolist()
-    
-    # Create checkpoint directory if needed
-    if output_dir:
-        checkpoint_dir = os.path.join(output_dir, "checkpoints")
-        create_directory(checkpoint_dir, logger)
-    
-    # Process examples individually
-    for i in range(0, len(test_comments)):
-        comment = test_comments[i]
+Regional bias includes stereotypes, prejudices, or discriminatory statements about:
+- Indian states or regions
+- People from specific Indian states  
+- Cultural, linguistic, economic, political, or infrastructural aspects of Indian regions
+
+Please analyze the following comment step by step:
+
+Comment: "{text}"
+
+Step 1: First, identify if this comment mentions any Indian state, region, or people from specific regions.
+
+Step 2: Check if the comment contains any of these elements:
+- Stereotypical statements about people from a region
+- Generalizations about a state or its people
+- Discriminatory language targeting regional identity
+- Prejudiced views about regional culture, language, or traditions
+- Biased statements about economic or developmental status
+- Political stereotypes associated with regions
+
+Step 3: Determine if these elements, if present, constitute bias or are merely factual/neutral observations.
+
+Step 4: Based on your analysis, classify this comment as:
+- "regional_bias": If it contains prejudiced, stereotypical, or discriminatory content about Indian regions/states
+- "non_regional_bias": If it's neutral, factual, or does not contain regional bias
+
+Please provide your reasoning followed by your final classification.
+
+Format your response as:
+Reasoning: [Your step-by-step analysis]
+Classification: [regional_bias/non_regional_bias] [/INST]
+"""
         
         try:
-            # Generate prompt with all examples
-            prompt = create_few_shot_prompt(examples_df, comment, random_seed)
-            
-            # Tokenize to check length
-            tokens = tokenizer(prompt, return_tensors="pt", truncation=False)
-            input_ids_length = tokens.input_ids.shape[1]
-            
-            if input_ids_length > max_length:  # If too long, use a simplified prompt
-                logger.warning(f"Prompt is very long ({input_ids_length} tokens). Using truncation.")
-                # If too long, use a simpler prompt for Mistral
-                prompt = "<s>[INST] "
-                prompt += "You are an expert in identifying regional biases in comments about Indian states and regions. "
-                prompt += "Task: Classify if the comment contains regional bias related to Indian states or regions.\n\n"
-                prompt += "Instructions:\n"
-                prompt += "- Regional Bias (1): Comments that contain stereotypes, prejudices, or biases about specific Indian states or regions.\n"
-                prompt += "- Non-Regional Bias (0): Comments that don't contain regional stereotypes or biases about Indian states.\n\n"
-                prompt += "Examples are provided separately. Based on these instructions:\n\n"
-                prompt += f"Classify this comment:\n\"{comment}\"\nClassification: [/INST] "
-            
-            # Clear token tensors
-            del tokens
-            
-            # Get prediction
-            prediction, raw_output = predict_with_model(model, tokenizer, prompt, device, max_length, logger=logger)
-            
-            # Store results
-            predictions.append(prediction)
-            raw_outputs.append(raw_output)
-            
-            # Log progress
-            if (i + 1) % 10 == 0 or i == 0:
-                logger.info(f"Processed example {i+1}/{len(test_comments)}")
-                logger.info(f"Decision: {prediction} (0=non-regional, 1=regional)")
-            
-            # Save checkpoint if enabled
-            if output_dir and ((i + 1) % checkpoint_interval == 0 or i == len(test_comments) - 1):
-                # Create a short model name for file naming
-                model_short_name = "mistral_7b_150examples"
-                
-                checkpoint_df = pd.DataFrame({
-                    'Comment': test_df['Comment'].iloc[:i+1].tolist(),
-                    'Cleaned_Comment': test_df['Cleaned_Comment'].iloc[:i+1].tolist(),
-                    'True_Label': test_df['Level-1'].iloc[:i+1].apply(lambda x: 1 if x >= 1 else 0).tolist(),
-                    'Predicted': predictions[:i+1],
-                    'Model_Output': [str(output)[:500] for output in raw_outputs[:i+1]]  # Truncate long outputs
-                })
-                checkpoint_path = os.path.join(output_dir, "checkpoints", f"{model_short_name}_checkpoint_{i+1}.csv")
-                checkpoint_df.to_csv(checkpoint_path, index=False)
-                logger.info(f"Saved checkpoint at {checkpoint_path}")
-        
-        except Exception as e:
-            logger.error(f"Error processing comment {i+1}: {e}")
-            predictions.append(0)  # Default to non-regional bias
-            raw_outputs.append(f"ERROR: {str(e)}")
-        
-        # Clear cache to prevent OOM errors
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+            # Clear memory before tokenization
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
             gc.collect()
+            
+            # Tokenize the prompt
+            inputs = self.tokenizer(
+                cot_prompt, 
+                return_tensors="pt", 
+                truncation=True, 
+                max_length=max_length
+            )
+            
+            # Move inputs to GPU if available
+            if torch.cuda.is_available():
+                inputs = {k: v.to("cuda") for k, v in inputs.items()}
+            
+            # Generate response
+            with torch.no_grad():
+                try:
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_new_tokens=max_new_tokens,
+                        temperature=0.1,  # Low temperature for more deterministic outputs
+                        do_sample=False,  # Deterministic generation
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        use_cache=True
+                    )
+                    
+                except torch.cuda.OutOfMemoryError:
+                    logger.error("CUDA out of memory during generation")
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        torch.cuda.synchronize()
+                    gc.collect()
+                    
+                    # Try with reduced parameters
+                    logger.info("Retrying with reduced parameters...")
+                    try:
+                        outputs = self.model.generate(
+                            **inputs,
+                            max_new_tokens=max_new_tokens // 2,  # Cut maximum tokens in half
+                            temperature=0.1,
+                            do_sample=False,
+                            pad_token_id=self.tokenizer.pad_token_id,
+                            use_cache=True
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed on retry: {e}")
+                        return {
+                            "classification": "non_regional_bias",  # Default to non-bias on failure
+                            "reasoning": "Error during model inference",
+                            "full_response": ""
+                        }
+                except Exception as e:
+                    logger.error(f"Error in model generation: {e}")
+                    return {
+                        "classification": "non_regional_bias",  # Default to non-bias on failure
+                        "reasoning": f"Error during processing: {str(e)}",
+                        "full_response": ""
+                    }
+            
+            # Decode the response
+            response = self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
+            
+            # Clear intermediate tensors
+            del outputs, inputs
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            gc.collect()
+            
+            # Extract classification and reasoning
+            return self._parse_response(response)
+            
+        except Exception as e:
+            logger.error(f"Error in classification: {e}")
+            return {
+                "classification": "non_regional_bias",  # Default to non-bias on failure
+                "reasoning": f"Error: {str(e)}",
+                "full_response": ""
+            }
     
-    return predictions, raw_outputs
-
-def save_results(test_df, predictions, raw_outputs, output_dir, logger, model_name="mistral_7b_150examples"):
-    """
-    Save prediction results and evaluation metrics
-    
-    Args:
-        test_df: DataFrame with test data
-        predictions: List of predictions
-        raw_outputs: List of raw model outputs
-        output_dir: Directory to save results
-        logger: Logger instance
-        model_name: Name of model for file naming
+    def _parse_response(self, response):
+        """Parse the model's response to extract classification and reasoning"""
+        lines = response.strip().split('\n')
+        reasoning = ""
+        classification = ""
         
-    Returns:
-        accuracy, f1_score
-    """
-    # Get true labels
-    true_labels = test_df['Level-1'].apply(lambda x: 1 if x >= 1 else 0).tolist()
+        for line in lines:
+            if line.startswith("Reasoning:"):
+                reasoning = line.replace("Reasoning:", "").strip()
+            elif line.startswith("Classification:"):
+                classification = line.replace("Classification:", "").strip().lower()
+        
+        # Validate classification - ensure we have a valid category
+        if "regional_bias" in classification and "non" not in classification:
+            classification = "regional_bias"
+        elif "non_regional_bias" in classification or "non-regional_bias" in classification:
+            classification = "non_regional_bias"
+        else:
+            logger.warning(f"Invalid classification: {classification}")
+            # Default to non_regional_bias rather than error for better downstream handling
+            classification = "non_regional_bias"
+        
+        return {
+            "classification": classification,
+            "reasoning": reasoning,
+            "full_response": response
+        }
+
+def save_iteration_results(iteration_results, output_dir, iteration_num, timestamp, prefix="mistral"):
+    """Save results for a single iteration"""
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
     
-    # Create visualization directory
-    viz_dir = os.path.join(output_dir, "visualizations")
-    create_directory(viz_dir, logger)
+    # Save as JSON
+    json_file = os.path.join(output_dir, f"{prefix}_iteration_{iteration_num}_results_{timestamp}.json")
+    with open(json_file, 'w') as f:
+        json.dump(iteration_results, f, indent=2)
     
-    # Save predictions with raw outputs
-    results_df = test_df.copy()
-    results_df['Predicted'] = predictions
-    
-    # Truncate raw outputs to prevent huge files
-    truncated_outputs = [str(output)[:500] for output in raw_outputs]
-    results_df['Model_Output'] = truncated_outputs
-    
-    # Create output paths
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    predictions_path = os.path.join(output_dir, f"{model_name}_predictions_{timestamp}.csv")
-    report_path = os.path.join(output_dir, f"{model_name}_report_{timestamp}.txt")
-    matrix_path = os.path.join(viz_dir, f"{model_name}_confusion_matrix_{timestamp}.png")
-    summary_path = os.path.join(viz_dir, f"{model_name}_results_summary_{timestamp}.png")
+    # Save as detailed CSV
+    df_results = pd.DataFrame(iteration_results)
+    csv_file = os.path.join(output_dir, f"{prefix}_iteration_{iteration_num}_detailed_{timestamp}.csv")
+    df_results.to_csv(csv_file, index=False)
     
     # Save predictions CSV
-    results_df.to_csv(predictions_path, index=False)
-    logger.info(f"Predictions saved to {predictions_path}")
+    predictions_data = [{
+        'index': result['index'],
+        'comment': result['original_comment'],
+        'prediction': result['classification'],
+        'prediction_binary': 1 if result['classification'] == 'regional_bias' else 0 if result['classification'] == 'non_regional_bias' else -1,
+        'reasoning': result.get('reasoning', '')
+    } for result in iteration_results]
     
-    # Generate classification report
-    report = classification_report(true_labels, predictions)
-    with open(report_path, 'w') as f:
-        f.write(f"Classification Report for {model_name}\n\n")
-        f.write(f"Timestamp: {timestamp}\n\n")
-        f.write(report)
-    logger.info(f"Classification report saved to {report_path}")
+    df_predictions = pd.DataFrame(predictions_data)
+    predictions_csv = os.path.join(output_dir, f"{prefix}_iteration_{iteration_num}_predictions_{timestamp}.csv")
+    df_predictions.to_csv(predictions_csv, index=False)
+    
+    logger.info(f"Iteration {iteration_num} results saved to {predictions_csv}")
+    
+    return predictions_csv
+
+def generate_evaluation_report(all_iterations_predictions, ground_truth, all_iterations_results, output_dir, model_name, prefix="mistral"):
+    """Generate comprehensive evaluation report for multiple iterations"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Calculate final predictions using majority voting
+    final_predictions = []
+    for i in range(len(ground_truth)):
+        predictions_for_sample = [predictions[i] for predictions in all_iterations_predictions if i < len(predictions)]
+        if predictions_for_sample:
+            final_predictions.append(Counter(predictions_for_sample).most_common(1)[0][0])
     
     # Calculate metrics
-    accuracy = accuracy_score(true_labels, predictions)
-    f1 = f1_score(true_labels, predictions)
+    report = classification_report(ground_truth, final_predictions, 
+                                target_names=['Non-Regional Bias', 'Regional Bias'], 
+                                output_dict=True)
+    report_text = classification_report(ground_truth, final_predictions, 
+                                      target_names=['Non-Regional Bias', 'Regional Bias'])
+    conf_matrix = confusion_matrix(ground_truth, final_predictions)
     
-    # Log metrics
-    logger.info(f"Accuracy: {accuracy:.4f}")
-    logger.info(f"F1 Score: {f1:.4f}")
+    # Create short model name for file naming
+    model_short_name = model_name.split('/')[-1] if '/' in model_name else model_name
     
-    # Generate confusion matrix
-    cm = confusion_matrix(true_labels, predictions)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=['Non-Regional Bias', 'Regional Bias'],
-                yticklabels=['Non-Regional Bias', 'Regional Bias'])
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title(f'Confusion Matrix - {model_name}')
-    plt.tight_layout()
-    plt.savefig(matrix_path)
-    logger.info(f"Confusion matrix saved to {matrix_path}")
+    # Save classification report as text file
+    report_file = os.path.join(output_dir, f"classification_report_{prefix}_{timestamp}.txt")
+    with open(report_file, 'w') as f:
+        f.write(f"=== Classification Report - {model_short_name} (Multiple Iterations with Majority Voting) ===\n\n")
+        f.write(f"Model: {model_name}\n")
+        f.write(f"Timestamp: {timestamp}\n")
+        f.write(f"Total Samples: {len(final_predictions)}\n")
+        f.write(f"Number of Iterations: {len(all_iterations_predictions)}\n\n")
+        f.write(report_text)
+        f.write("\n\n=== Confusion Matrix ===\n")
+        f.write(str(conf_matrix))
+        f.write("\n\nRows: Actual labels\n")
+        f.write("Columns: Predicted labels\n")
+        
+        # Add iteration-wise metrics
+        f.write("\n\n=== Iteration-wise Performance ===\n")
+        for i, predictions in enumerate(all_iterations_predictions):
+            iter_report = classification_report(ground_truth[:len(predictions)], predictions, 
+                                              target_names=['Non-Regional Bias', 'Regional Bias'], 
+                                              output_dict=True)
+            f.write(f"\nIteration {i+1} Accuracy: {iter_report['accuracy']:.4f}")
     
-    # Create a comprehensive results visualization
-    plt.figure(figsize=(12, 8))
+    # Create visualizations directory
+    viz_dir = os.path.join(output_dir, "visualizations")
+    os.makedirs(viz_dir, exist_ok=True)
     
-    # Create a 2x2 grid of subplots
-    plt.subplot(2, 2, 1)
-    # Plot confusion matrix as heatmap
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+    # 1. Confusion Matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', 
                 xticklabels=['Non-Regional', 'Regional'],
                 yticklabels=['Non-Regional', 'Regional'])
-    plt.title('Confusion Matrix')
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    
-    # Plot class distribution
-    plt.subplot(2, 2, 2)
-    class_counts = pd.Series(true_labels).value_counts().sort_index()
-    plt.bar(['Non-Regional', 'Regional'], [class_counts.get(0, 0), class_counts.get(1, 0)], 
-            color=['#1f77b4', '#ff7f0e'])
-    plt.title('Test Set Class Distribution')
-    plt.ylabel('Number of Samples')
-    
-    # Add value labels on bars
-    plt.text(0, class_counts.get(0, 0) + 5, str(class_counts.get(0, 0)), ha='center')
-    plt.text(1, class_counts.get(1, 0) + 5, str(class_counts.get(1, 0)), ha='center')
-    
-    # Plot prediction distribution
-    plt.subplot(2, 2, 3)
-    pred_counts = pd.Series(predictions).value_counts().sort_index()
-    plt.bar(['Non-Regional', 'Regional'], [pred_counts.get(0, 0), pred_counts.get(1, 0)], 
-            color=['#2ca02c', '#d62728'])
-    plt.title('Model Predictions')
-    plt.ylabel('Number of Samples')
-    
-    # Add value labels on bars
-    plt.text(0, pred_counts.get(0, 0) + 5, str(pred_counts.get(0, 0)), ha='center')
-    plt.text(1, pred_counts.get(1, 0) + 5, str(pred_counts.get(1, 0)), ha='center')
-    
-    # Plot accuracy and F1
-    plt.subplot(2, 2, 4)
-    plt.bar(['Accuracy', 'F1 Score'], [accuracy, f1], color=['#9467bd', '#8c564b'])
-    plt.ylim(0, 1.0)
-    plt.title('Model Performance')
-    plt.text(0, accuracy + 0.05, f"{accuracy:.4f}", ha='center')
-    plt.text(1, f1 + 0.05, f"{f1:.4f}", ha='center')
-    
+    plt.title(f'Confusion Matrix - {model_short_name}')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
     plt.tight_layout()
-    plt.savefig(summary_path)
-    logger.info(f"Results summary visualization saved to {summary_path}")
+    confusion_matrix_file = os.path.join(viz_dir, f"confusion_matrix_{prefix}_{timestamp}.png")
+    plt.savefig(confusion_matrix_file, dpi=300, bbox_inches='tight')
+    plt.close()
     
-    return accuracy, f1
+    # 2. Iteration Agreement Visualization
+    plt.figure(figsize=(10, 6))
+    agreement_data = []
+    for i in range(len(ground_truth)):
+        predictions_for_sample = [predictions[i] for predictions in all_iterations_predictions if i < len(predictions)]
+        if predictions_for_sample:
+            agreement = len(set(predictions_for_sample)) == 1
+            agreement_data.append(1 if agreement else 0)
+    
+    agreement_rate = sum(agreement_data) / len(agreement_data) if agreement_data else 0
+    plt.bar(['Agreement', 'Disagreement'], 
+            [sum(agreement_data), len(agreement_data) - sum(agreement_data)], 
+            color=['green', 'red'])
+    plt.title(f'Iteration Agreement Rate: {agreement_rate:.2%}')
+    plt.ylabel('Number of Samples')
+    agreement_file = os.path.join(viz_dir, f"iteration_agreement_{prefix}_{timestamp}.png")
+    plt.savefig(agreement_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # 3. Class Distribution
+    plt.figure(figsize=(10, 6))
+    class_counts = [
+        sum(label == 0 for label in ground_truth),
+        sum(label == 1 for label in ground_truth)
+    ]
+    pred_counts = [
+        sum(pred == 0 for pred in final_predictions),
+        sum(pred == 1 for pred in final_predictions)
+    ]
+    
+    x = np.arange(2)
+    width = 0.35
+    
+    plt.bar(x - width/2, class_counts, width, label='Actual', color='skyblue')
+    plt.bar(x + width/2, pred_counts, width, label='Predicted', color='lightcoral')
+    
+    plt.xlabel('Class')
+    plt.ylabel('Count')
+    plt.title('Class Distribution: Actual vs Predicted')
+    plt.xticks(x, ['Non-Regional', 'Regional'])
+    plt.legend()
+    
+    # Add count labels on bars
+    for i, count in enumerate(class_counts):
+        plt.text(i - width/2, count + 5, str(count), ha='center')
+    for i, count in enumerate(pred_counts):
+        plt.text(i + width/2, count + 5, str(count), ha='center')
+    
+    distribution_file = os.path.join(viz_dir, f"class_distribution_{prefix}_{timestamp}.png")
+    plt.savefig(distribution_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Save detailed evaluation report as JSON
+    report_data = {
+        'timestamp': timestamp,
+        'model': model_name,
+        'total_samples': len(final_predictions),
+        'accuracy': report['accuracy'],
+        'metrics': {
+            'non_regional_bias': report['Non-Regional Bias'],
+            'regional_bias': report['Regional Bias'],
+            'weighted_avg': report['weighted avg'],
+            'macro_avg': report['macro avg']
+        },
+        'confusion_matrix': conf_matrix.tolist(),
+        'predictions_distribution': {
+            'non_regional_bias': int(np.sum(np.array(final_predictions) == 0)),
+            'regional_bias': int(np.sum(np.array(final_predictions) == 1))
+        },
+        'iteration_agreement_rate': agreement_rate
+    }
+    
+    json_report_file = os.path.join(output_dir, f"evaluation_report_{prefix}_{timestamp}.json")
+    with open(json_report_file, 'w') as f:
+        json.dump(report_data, f, indent=2)
+    
+    logger.info("\n=== Evaluation Report ===")
+    logger.info(f"Model: {model_name}")
+    logger.info(f"Total Samples: {len(final_predictions)}")
+    logger.info(f"Accuracy: {report['accuracy']:.4f}")
+    logger.info(f"Reports saved to {output_dir}")
 
 def main():
     """Main execution function"""
-    # Parse arguments
-    args = parse_arguments()
+    # Parse command line arguments
+    args = parse_args()
     
-    # Create required directories
-    for directory in [args.output_dir, args.cache_dir, args.log_dir]:
-        create_directory(directory)
+    # Set up environment variables and logging
+    setup_environment(args)
     
-    # Create a short model name for file naming
-    model_short_name = "mistral_7b_150examples"
+    # Create a model prefix for file naming
+    model_prefix = args.model_name.split('/')[-1].lower() if '/' in args.model_name else args.model_name.lower()
     
-    # Set up logging
-    logger = setup_logging(args.log_dir, model_short_name)
+    # Generate timestamp for this run
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # Log arguments
-    logger.info("Arguments:")
-    for arg, value in vars(args).items():
-        # Don't log the token for security
-        if arg == 'hf_token':
-            logger.info(f"  {arg}: {'*' * 8 if value else 'Not provided'}")
+    # Verify input file exists
+    data_path = Path(args.data_path)
+    if not data_path.exists():
+        logger.error(f"Input file not found: {data_path}")
+        return
+    
+    # Load data
+    logger.info(f"Loading data from {data_path}")
+    df = pd.read_csv(data_path)
+    logger.info(f"Data shape: {df.shape}")
+    
+    # Validate data
+    if 'Comment' not in df.columns:
+        # Try to find a suitable column
+        text_columns = [col for col in df.columns if df[col].dtype == 'object']
+        if text_columns:
+            logger.warning(f"'Comment' column not found. Using '{text_columns[0]}' instead.")
+            df['Comment'] = df[text_columns[0]]
         else:
-            logger.info(f"  {arg}: {value}")
+            raise ValueError("No suitable text column found in the data")
     
-    # Set random seed for reproducibility
-    np.random.seed(args.random_seed)
-    torch.manual_seed(args.random_seed)
-    logger.info(f"Random seed set to {args.random_seed}")
-    
-    # Start timing
-    start_time = time.time()
-    
+    # Apply max_samples limit if specified
+    if args.max_samples and args.max_samples < len(df):
+        logger.info(f"Limiting to {args.max_samples} samples")
+        df = df.iloc[:args.max_samples].copy()
+        
+    # Try to login to HuggingFace if token provided
     try:
-        # Load datasets
-        examples_df, test_df = load_datasets(
-            args.examples_path, args.test_path, logger, args.test_limit
-        )
-        
-        # Set up model and tokenizer
-        model, tokenizer, device = setup_model(
-            args.model_name, args.cache_dir, args.gpu_id, args.hf_token, logger
-        )
-        
-        # Predict using our examples dataset with all examples
-        logger.info(f"Processing {len(test_df)} comments with all {len(examples_df)} few-shot examples...")
-        
-        predictions, raw_outputs = batch_predict(
-            model, tokenizer, test_df, examples_df, device,
-            max_length=args.max_length,
-            random_seed=args.random_seed,
-            checkpoint_interval=args.checkpoint_interval,
-            output_dir=args.output_dir,
-            logger=logger
-        )
-        
-        # Save results
-        accuracy, f1 = save_results(
-            test_df, predictions, raw_outputs, args.output_dir, logger, 
-            model_name=model_short_name
-        )
-        
-        # End timing
-        end_time = time.time()
-        elapsed_hours = (end_time - start_time) / 3600
-        logger.info(f"Total execution time: {elapsed_hours:.2f} hours")
-        
-        # Final summary
-        logger.info("===== Final Summary =====")
-        logger.info(f"Model: {args.model_name}")
-        logger.info(f"Test set size: {len(test_df)}")
-        logger.info(f"Few-shot examples: {len(examples_df)}")
-        logger.info(f"Accuracy: {accuracy:.4f}")
-        logger.info(f"F1 Score: {f1:.4f}")
-    
+        if args.hf_token:
+            login(token=args.hf_token)
+            logger.info("Successfully logged in to HuggingFace")
+        elif os.environ.get("HF_TOKEN"):
+            login(token=os.environ["HF_TOKEN"])
+            logger.info("Successfully logged in to HuggingFace using environment token")
     except Exception as e:
-        logger.error(f"Error in main execution: {e}", exc_info=True)
-        sys.exit(1)
+        logger.warning(f"Could not log in to HuggingFace: {e}")
+        logger.warning("Attempting to proceed without login...")
+    
+    # Initialize classifier
+    try:
+        classifier = RegionalBiasClassifier(
+            model_name=args.model_name,
+            cache_dir=args.cache_dir,
+            hf_token=args.hf_token,
+            quantization=args.quantization,
+            max_gpu_memory=args.max_gpu_memory,
+            cpu_offload=args.cpu_offload
+        )
+    except torch.cuda.OutOfMemoryError:
+        logger.error("Not enough GPU memory for this model")
+        logger.error("Try using 4-bit quantization, enabling CPU offloading, or a smaller model.")
+        return
+    except Exception as e:
+        logger.error(f"Error initializing classifier: {e}")
+        return
+    
+    # Store results for all iterations
+    all_iterations_results = []
+    all_iterations_predictions = []
+    ground_truth = []
+    iteration_csv_files = []
+    
+    logger.info(f"\nStarting classification with {args.num_iterations} iterations...")
+    
+    # Run multiple iterations
+    for iteration in range(args.num_iterations):
+        logger.info(f"\n=== Iteration {iteration + 1}/{args.num_iterations} ===")
+        
+        iteration_results = []
+        iteration_predictions = []
+        
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Iteration {iteration + 1}"):
+            comment = str(row['Comment'])
+            
+            try:
+                # Get classification with CoT
+                result = classifier.classify_with_cot(
+                    comment, 
+                    max_length=args.max_length,
+                    max_new_tokens=args.max_new_tokens
+                )
+                
+                # Store results
+                result['index'] = idx
+                result['original_comment'] = comment
+                result['iteration'] = iteration + 1
+                iteration_results.append(result)
+                
+                # For evaluation
+                if result['classification'] != 'error':
+                    iteration_predictions.append(1 if result['classification'] == 'regional_bias' else 0)
+                    
+                    # Collect ground truth only in first iteration
+                    if iteration == 0:
+                        if 'Score' in df.columns:  # Assuming Score > 0 means regional bias
+                            ground_truth.append(1 if float(row['Score']) > 0 else 0)
+                        elif 'Level-1' in df.columns:  # Alternative ground truth column
+                            ground_truth.append(1 if float(row['Level-1']) > 0 else 0)
+                
+            except Exception as e:
+                logger.error(f"Error processing comment {idx} in iteration {iteration + 1}: {e}")
+                iteration_results.append({
+                    "index": idx,
+                    "original_comment": comment,
+                    "classification": "non_regional_bias",  # Default to non-bias on error
+                    "reasoning": f"Error: {str(e)}",
+                    "full_response": "",
+                    "iteration": iteration + 1
+                })
+            
+            # Clear GPU cache periodically
+            if (idx + 1) % 10 == 0 and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                gc.collect()
+        
+        # Store iteration results
+        all_iterations_results.append(iteration_results)
+        all_iterations_predictions.append(iteration_predictions)
+        
+        # Save iteration results
+        iter_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        predictions_csv = save_iteration_results(
+            iteration_results, 
+            args.output_dir, 
+            iteration + 1, 
+            iter_timestamp,
+            prefix=model_prefix
+        )
+        iteration_csv_files.append(predictions_csv)
+        
+        logger.info(f"Iteration {iteration + 1} completed.")
+    
+    # Combine results and calculate final predictions
+    final_results = []
+    for idx in range(len(df)):
+        comment_results = []
+        for iteration_results in all_iterations_results:
+            for result in iteration_results:
+                if result['index'] == idx:
+                    comment_results.append(result)
+        
+        # Get classifications from all iterations
+        classifications = [r['classification'] for r in comment_results if r['classification'] != 'error']
+        
+        # Use majority voting for final classification
+        if classifications:
+            final_classification = Counter(classifications).most_common(1)[0][0]
+        else:
+            final_classification = 'non_regional_bias'  # Default to non-bias if no valid classifications
+        
+        final_results.append({
+            'index': idx,
+            'original_comment': df.iloc[idx]['Comment'],
+            'final_classification': final_classification,
+            'iteration_classifications': classifications,
+            'all_iteration_results': comment_results
+        })
+    
+    # Save final combined results
+    final_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Save final JSON
+    final_results_file = os.path.join(args.output_dir, f"{model_prefix}_final_results_{final_timestamp}.json")
+    with open(final_results_file, 'w') as f:
+        json.dump(final_results, f, indent=2)
+    
+    # Save final combined CSV
+    final_df_data = []
+    for result in final_results:
+        final_df_data.append({
+            'index': result['index'],
+            'comment': result['original_comment'],
+            'final_classification': result['final_classification'],
+            'final_classification_binary': 1 if result['final_classification'] == 'regional_bias' else 0 if result['final_classification'] == 'non_regional_bias' else -1,
+            'iteration_1': result['iteration_classifications'][0] if len(result['iteration_classifications']) > 0 else 'N/A',
+            'iteration_2': result['iteration_classifications'][1] if len(result['iteration_classifications']) > 1 else 'N/A',
+            'iteration_3': result['iteration_classifications'][2] if len(result['iteration_classifications']) > 2 else 'N/A',
+            'num_iterations_completed': len(result['iteration_classifications']),
+            'all_agree': len(set(result['iteration_classifications'])) == 1 if result['iteration_classifications'] else False
+        })
+    
+    final_df = pd.DataFrame(final_df_data)
+    final_csv_file = os.path.join(args.output_dir, f"{model_prefix}_final_combined_{final_timestamp}.csv")
+    final_df.to_csv(final_csv_file, index=False)
+    
+    logger.info(f"\nFinal combined results saved to:")
+    logger.info(f"- JSON: {final_results_file}")
+    logger.info(f"- CSV: {final_csv_file}")
+    
+    # Generate evaluation report if ground truth is available
+    if ground_truth:
+        generate_evaluation_report(
+            all_iterations_predictions, 
+            ground_truth, 
+            all_iterations_results, 
+            args.output_dir,
+            args.model_name,
+            prefix=model_prefix
+        )
+    else:
+        logger.warning("No ground truth available for evaluation")
 
 if __name__ == "__main__":
+    # Check GPU availability
+    if torch.cuda.is_available():
+        print(f"CUDA is available. Found {torch.cuda.device_count()} GPU(s)")
+        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+        
+        # Set PyTorch settings
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    else:
+        print("CUDA is not available. Using CPU only (will be very slow).")
+    
+    # Run classification
+    print("Starting regional bias classification...")
     main()
