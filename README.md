@@ -10,10 +10,8 @@ This project investigates regional social biases in India by leveraging natural 
 Crawl and extract state-wise social bias-related comments from:
 
          a) Reddit
-
-         b) Quora
-
-         c) YouTube
+         
+         b) YouTube
 
 Preprocess and clean the dataset to remove noise and irrelevant data.
 
@@ -56,11 +54,6 @@ Create benchmark metrics to evaluate LLM performance:
 
 Accuracy, Precision, Recall, F1-score
 
-## Studying regional biases
-- [List of regional biases](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/Miscellaneous/regional%20biases%20.csv)
-
-This is a list of regional biases in India. The information is gathered through an extensive study of news articles and social media discussions.
-
 ## Dataset Annotation 
 
 We have developed a comprehensive annotation framework to understand the nature and intensity of the regional biases. 
@@ -99,7 +92,7 @@ The annotation process includes two groups. Disagreements were resolved through 
 
 ## Dataset
 
-- [Data](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/Miscellaneous/Regional_bias_data%20.csv)
+- [Data](https://github.com/debby123p/Detecting-Indian-Regional-Biases-in-Online-Social-Interactions-using-Large-Language-Models/blob/main/Miscellaneous/Regional_bias_data.csv)
 
 The breakdown of the data among social media platforms is the following:
 
