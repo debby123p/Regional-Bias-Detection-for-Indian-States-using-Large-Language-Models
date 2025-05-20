@@ -1,4 +1,4 @@
-# Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models
+# Detecting-Indian-Regional-Biases-in-Online-Social-Interactions-using-Large-Language-Models
 ## Overview
 
 This project investigates regional social biases in India by leveraging natural language processing and large language models (LLMs). We curated a comprehensive dataset of comments from Reddit, YouTube, and Quora that contain explicit or implicit regional biases toward different Indian states and regions. Through rigorous annotation, classification, and model evaluation, we aim to understand how these biases manifest online and how effectively LLMs can identify them.
