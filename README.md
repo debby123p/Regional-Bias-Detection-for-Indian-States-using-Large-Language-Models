@@ -21,7 +21,7 @@ Preprocess and clean the dataset to remove noise and irrelevant data.
 
 Apply a sentiment classifier to each comment to assign a sentiment score.
 
-Categorize comments into positive and negative classes.
+Categorise comments into positive and negative classes.
 
 **3. Multi-level Annotation**
 
@@ -29,7 +29,7 @@ Level-1: Classify comments as regional bias and non-regional bias.
 
 Level-2: Rate the severity of stereotypical comments (mild, moderate, severe)
 
-Level-3: Categorize by bias types:
+Level-3: Categorise by bias types:
 
 - Linguistic Bias
 - Cultural Bias
@@ -44,7 +44,7 @@ Associate each stereotypical comment with specific target states/regions
 
 Zero-shot Classification:
 
-Evaluate multiple LLMs' ability to classify biases without examples.Test different prompting strategies to optimize zero-shot performance.
+Evaluate multiple LLMs' ability to classify biases without examples. Test different prompting strategies to optimise zero-shot performance.
 
 Few-shot Classification:
 
@@ -183,7 +183,9 @@ The examples are randomly selected from the annotated dataset, that is, **100 co
 - [Qwen_2.5_7B_instruct](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Qwen_2.5_7b_instruct.py)
 - [Deepseek_R1_Distill_Qwen_7B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Deepseek_r1_distill_7b.py)
 
+## Acknowledgement
 
+We would like to formally recognise the contributions of Claude, which served as an AI-powered coding assistant, providing significant support during the development of this project
 
 
 
