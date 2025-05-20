@@ -35,8 +35,7 @@ Level-3: Categorise by bias types:
 - Political Bias
 - Infrastructure Bias
 
-
-Associate each stereotypical comment with specific target states/regions
+Level-4: Associate each stereotypical comment with specific target states/regions
 
 **4. LLM Classification Pipeline**
 
