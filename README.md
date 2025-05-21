@@ -91,7 +91,7 @@ The annotation process includes two groups. Disagreements were resolved through 
 
 ## Dataset
 
-- [Data](https://github.com/debby123p/Detecting-Indian-Regional-Biases-in-Online-Social-Interactions-using-Large-Language-Models/blob/main/Miscellaneous/Regional_bias_data.csv)
+- [Data](https://github.com/debby123p/Detecting-Indian-Regional-Biases-in-Online-Social-Interactions-using-Large-Language-Models/blob/main/Regional_bias_data.csv)
 
 The breakdown of the data among social media platforms is the following:
 
@@ -150,7 +150,9 @@ The classification techniques involve the use of a smaller number of examples wi
 
 **Few-Shot (Support-100)**
 
-The examples are randomly selected from the annotated dataset, that is, **50 comments tagged regional biases and 50 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
+The code implements a few-shot learning pipeline where 100 annotated examples (50 with regional bias, 50 without) are used to prompt large language models to classify new comments. This approach requires no fine-tuning while providing strong classification performance. These examples are randomly selected and saved in a .csv file, which can be used for all the models as an input, along with the prompt, and testing happens on those comments that do not belong to the examples csv file. The examples are saved in this file: [few_shot_support_100](https://github.com/debby123p/Detecting-Indian-Regional-Biases-in-Online-Social-Interactions-using-Large-Language-Models/blob/main/few_shot_100_examples/few_shot_support_100%20.csv)
+
+The implementation supports multiple language models, including:
 
 - [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/deepseek_r1_distill_qwen_1.5b.py)
 - [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Summarizing-personalised-social-biases-towards-Indian-states-using-different-LLMs/blob/main/few_shot_100_examples/mistral_7b_instruct_v0.3.py)
@@ -159,7 +161,9 @@ The examples are randomly selected from the annotated dataset, that is, **50 com
 
 **Few-Shot (Support-150)**
 
-The examples are randomly selected from the annotated dataset, that is, **75 comments tagged regional biases and 75 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
+The code implements a few-shot learning pipeline where 150 annotated examples (75 with regional bias, 75 without) are used to prompt large language models to classify new comments. This approach requires no fine-tuning while providing strong classification performance. These examples are randomly selected and saved in a .csv file, which can be used for all the models as an input, along with the prompt, and testing happens on those comments that do not belong to the examples csv file. The examples are saved in this file: [few_shot_support_150](https://github.com/debby123p/Detecting-Indian-Regional-Biases-in-Online-Social-Interactions-using-Large-Language-Models/blob/main/few_shot_150_examples/few_shot_support_150.csv)
+
+The implementation supports multiple language models, including:
 
 - [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/deepseek_r1_distill_qwen_1.5b.py)
 - [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_150_examples/Mistral_7b_instruct_v0.3.py)
@@ -168,12 +172,42 @@ The examples are randomly selected from the annotated dataset, that is, **75 com
   
 **Few-Shot (Support-200)**
 
-The examples are randomly selected from the annotated dataset, that is, **100 comments tagged regional biases and 100 comments tagged as non-regional biases**, as input to the prompt as support examples, helping the model to understand the nuances better.
+The code implements a few-shot learning pipeline where 200 annotated examples (100 with regional bias, 100 without) are used to prompt large language models to classify new comments. This approach requires no fine-tuning while providing strong classification performance. These examples are randomly selected and saved in a .csv file, which can be used for all the models as an input, along with the prompt, and testing happens on those comments that do not belong to the examples csv file. The examples are saved in this file: [few_shot_support_200](https://github.com/debby123p/Detecting-Indian-Regional-Biases-in-Online-Social-Interactions-using-Large-Language-Models/blob/main/few_shot_200_examples/few_shot_support_200.csv)
+
+The implementation supports multiple language models, including:
 
 - [Deepseek_R1_Distill_Qwen_1.5B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Deepseek_r1_distill_1.5b.py)
 - [Mistral_7B_instruct_v0.3](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Mistral_7b_instruct_v0.3.py)
 - [Qwen_2.5_7B_instruct](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Qwen_2.5_7b_instruct.py)
 - [Deepseek_R1_Distill_Qwen_7B](https://github.com/debby123p/Regional-Bias-Detection-for-Indian-States-using-Large-Language-Models/blob/main/few_shot_200_examples/Deepseek_r1_distill_7b.py)
+
+## Requirements
+
+-Python 3.8+
+
+-PyTorch 2.0+
+
+-Transformers 4.30+
+
+-pandas, numpy, matplotlib, seaborn
+
+-scikit-learn
+
+## Output
+
+The code generates several outputs:
+
+1. logs/*.log: Detailed logs of the execution
+   
+2. results/*/checkpoints/: Checkpoint files saved during execution
+   
+3. results/*_predictions_*.csv: CSV file with predictions
+   
+4. results/*_report_*.txt: Classification report with precision, recall, F1
+   
+5. results/visualizations/*_confusion_matrix_*.png: Confusion matrix visualization
+   
+6. results/visualizations/*_results_summary_*.png: Summary of classification results
 
 ## Acknowledgement
 
